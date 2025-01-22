@@ -9,7 +9,7 @@ library(tidyr)
 kelp.net <- read_csv("Desktop/R_stuff/kelp_restoration/data_files/kelp_jan.9.25.csv")[-c(1,2),]
 
 # What does the restoration network look like first cut 
-# 
+# wkwxewe
 
 # Org Names ---------------------------------------------------
 
