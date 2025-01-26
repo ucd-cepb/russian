@@ -1,0 +1,229 @@
+---
+title: "ERGM Walk through"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
+---
+  
+**Author: M Fisher**
+
+**Date compiled: 1/26/2025**
+
+
+## Description
+
+Use a mini kelp social network to walk through ERGMs in R, using the packages `igraph`, `sna`, and `ergm`. 
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(here)
+library(tidyverse)
+library(magrittr)
+library(janitor)
+
+
+library(ergm)
+library(sna)
+library(igraph)
+```
+
+
+## Network Data
+
+### raw data
+
+```{r cars}
+kelp.net <- read_csv(here('confidential_data','kelp_jan.9.25.csv'), show_col_types = FALSE) %>%
+  dplyr::select(-c(1,2)) %>%
+  filter(!row_number() %in% c(1, 2)) %>%
+  clean_names()
+
+colnames(kelp.net)
+```
+
+Grab only the info needed to create our social network (individual IDs, organizations they work for, organizations they *work on programs / projects with*)
+```{r}
+kelp.net.sub <- kelp.net %>%
+  unite(col = "org_name", c('q3_individual_1', 'q3_several_1'), sep = "", na.rm = TRUE, remove = FALSE) %>%
+  dplyr::select(response_id, org_name, starts_with("q11"))
+
+colnames(kelp.net.sub)
+length(unique(kelp.net.sub$response_id))
+```
+
+Re-arrange the data to make it easier to work with.
+```{r}
+kelp.edges <- kelp.net.sub %>%
+  pivot_longer(starts_with('q11'), names_to = 'alter_count', values_to = 'alter')
+
+head(kelp.edges)
+```
+
+clean up the names so we don't have to deal with capitalization, spaces. 
+```{r}
+## 
+kelp.edges %<>% mutate(alter = make_clean_names(org_name, allow_dupes = TRUE),
+                       alter = make_clean_names(alter, allow_dupes = TRUE)) %>%
+  
+```
+
+
+### subset network 
+
+We don't need all of the network to practice ERGMs. Let's just grab most people who work in / with an organization associated with DISES, to make things simpler. *Note that some people wrote in 'dises', these responses won't be represented in this mini network. 
+```{r}
+keep_orgs <-  c('davis','ucd','santa_cruz', 'ucsc', 'cal_poly_humboldt','reefcheck','reef_check','gfnms')
+
+kelpg.df <- kelp.edges %>%
+  filter(grepl(paste(keep_orgs, collapse="|"), org_name)==TRUE | grepl(paste(keep_orgs, collapse="|"), alter))
+
+dim(kelpg.df)
+length(unique(kelpg.df$response_id))
+```
+
+Now, simplify the org names so they match. 
+```{r}
+kelpg.df %<>% mutate(alter = case_when (
+  grepl(paste(keep_orgs[1:2], collapse="|"), org_name) ~ 'uc_davis',
+  grepl(paste(keep_orgs[3:4], collapse="|"), org_name) ~ 'uc_santa_cruz',
+  grepl(keep_orgs[5], org_name) ~ 'cal_poly_humboldt',
+  grepl(paste(keep_orgs[6:7], collapse="|"), org_name) ~ 'reef_check',
+  grepl(keep_orgs[8], org_name) ~ 'gfnms',
+  .default=org_name
+), 
+alter = case_when (
+  grepl(paste(keep_orgs[1:2], collapse="|"), alter) ~ 'uc_davis',
+  grepl(paste(keep_orgs[3:4], collapse="|"), alter) ~ 'uc_santa_cruz',
+  grepl(keep_orgs[5], alter) ~ 'cal_poly_humboldt',
+  grepl(paste(keep_orgs[6:7], collapse="|"), alter) ~ 'reef_check',
+  grepl(keep_orgs[8], alter) ~ 'gfnms',
+  .default=alter
+)
+)
+```
+
+what org names are left that we might need to clean up?
+```{r}
+kelpg.df$org_name[which(!(kelpg.df$org_name %in% c('uc_davis','uc_santa_cruz','cal_poly_humboldt','reef_check', 'gfnms')))]
+```
+
+some final clean up...
+```{r}
+kelpg.df %<>% mutate(alter = case_when (
+  grepl('univ_ca_santa_barbara', org_name) ~ 'uc_santa_barbara',
+  grepl('sunflower_star', org_name) ~ 'sunflower_star_lab',
+  grepl('urchin_commission', org_name) ~ 'ca_sea_urchin_commission',
+  grepl('great_great_kelp', org_name) ~ 'giant_giant_kelp_restoration',
+  grepl('giant_giant_kelp', org_name) ~ 'giant_giant_kelp_restoration',
+  grepl('greater_farallones', org_name) ~ 'gfnms',
+  grepl('university_of_wisconsin', org_name) ~ 'uwisc_milwaukee',
+  grepl('friday_harbor', org_name) ~ 'uw_friday_harbor',
+  grepl('moss_landing_marine', org_name) ~ 'sjsu_moss_landing',
+  .default=org_name
+))
+
+unique(kelpg.df$org_name)
+```
+
+again for the alters ...
+```{r}
+unique(kelpg.df$alter[which(!(kelpg.df$alter %in% c('uc_davis','uc_santa_cruz','cal_poly_humboldt','reef_check', 'gfnms')))])
+```
+
+
+```{r}
+kelpg.df %<>% mutate(alter = case_when (
+  grepl('univ_ca_santa_barbara', alter) ~ 'uc_santa_barbara',
+  grepl('sunflower_star', alter) ~ 'sunflower_star_lab',
+  grepl('urchin_commission', alter) ~ 'ca_sea_urchin_commission',
+  grepl('great_great_kelp', alter) ~ 'giant_giant_kelp_restoration',
+  grepl(paste(c('giant_giant_kelp','g_2_kelp','g2kr'),collapse='|'), alter) ~ 'giant_giant_kelp_restoration',
+  grepl('greater_farallones', alter) ~ 'gfnms',
+  grepl('university_of_wisconsin', alter) ~ 'uwisc_milwaukee',
+  grepl('friday_harbor', alter) ~ 'uw_friday_harbor',
+  grepl('moss_landing_marine', alter) ~ 'sjsu_moss_landing',
+  grepl('nature_conservancy', alter) ~ 'the_nature_conservancy',
+  grepl(paste(c('sean_craig','rafael_cuevas_uribe','paul_bourdeau','csu','hsu'),collapse='|'), alter) ~ 'cal_poly_humboldt',
+  grepl(paste(c('cal_seagrant', 'sea_grant'),collapse='|'), alter) ~ 'california_sea_grant',
+  grepl('tristin_mc_hugh', alter) ~ 'the_nature_conservancy',
+  grepl('jan_freiwald', alter) ~ 'reef_check',
+  grepl('kristen_elsmore', alter) ~ 'california_department_of_fish_and_wildlife',
+  grepl('tnc', alter) ~ 'the_nature_conservancy',
+  grepl('ocean_science_trust', alter) ~ 'ocean_science_trust',
+  grepl('rcca', alter) ~ 'rcca',
+  grepl(paste(c('watermens_alliance','watermans_alliance','waterman_s_alliance'),collapse='|'), alter) ~ 'watermens_alliance',
+  grepl('watermans_alliance', alter) ~ 'watermens_alliance',
+  grepl('girl_scouts_of_america', alter) ~ 'girl_scouts_of_america',
+  grepl('surfrider', alter) ~ 'surfrider',
+  grepl('monterey_bay_aquarium', alter) ~ 'monterey_bay_aquarium',
+  grepl('sea_ranch_association', alter) ~ 'sea_ranch_association',
+  grepl('surfrider', alter) ~ 'surfrider',
+  grepl(paste(c('hughes','sonoma_state'), collapse='|'), alter) ~ 'sonoma_state_university',
+  grepl('ucsb', alter) ~ 'uc_santa_barbara',
+  grepl('mbnms', alter) ~ 'noaa_monterey_bay_national_marine_sanctuary',
+  grepl('dan_abbott', alter) ~ 'reef_check',
+  grepl(paste(c('urchin_diver','commercial_divers'),collapse='|'), alter) ~ 'commercial_urchin_divers',
+  .default=alter
+))
+
+unique(kelpg.df$alter)
+```
+
+ok, final clean up-- just remove some edges
+```{r}
+kelpg.df %<>% filter(!(alter %in% c('di_ses_ppl','kelp_rises_personnel','na','x')) & !(grepl('mermaid',alter)))
+
+kelpg.df %<>% mutate(alter=ifelse(alter=='the_cher_ae_heights_indian_community_of_the_trinidad_rancheria',
+                                  'the_cherAe_heights_indian_community_of_the_trinidad_rancheria', alter))
+
+unique(c(kelpg.df$alter,kelpg.df$org_name))
+```
+
+yay! 
+
+## Create graph
+
+Un-weighted, directed `network` object
+```{r}
+kelpg.df %>%
+  mutate(org_name=ifelse(org_name=='x', response_id, org_name)) %>%
+  dplyr::select(org_name, alter) %>%
+  distinct() %>%
+  filter(org_name != alter) %>%
+  distinct() %>%
+  as.network(directed=TRUE) -> kelp.g
+
+class(kelp.g)
+```
+
+There doesn't appear to be a way to create a weighted network? There is in igraph...
+```{r}
+kelp.wg.df <- kelpg.df %>%
+  mutate(org_name=ifelse(org_name=='x', response_id, org_name)) %>%
+  group_by(org_name, alter) %>%
+  summarise(n=n()) %>%
+  filter(org_name != alter)
+
+kelp.wg <- igraph::graph_from_edgelist(as.matrix(kelp.wg.df[,1:2]), directed=TRUE)
+
+E(kelp.wg)$weight <- kelp.wg.df$n
+
+class(kelp.wg)
+```
+save an image of our mini network
+```{r}
+png(here('scripts','00_ergm_walkthrough.png'))
+plot(kelp.wg, l=layout_with_fr(kelp.wg))
+dev.off()
+```
+
+
+## ERGM walkthrough
+
+### Part 1. 
+
+

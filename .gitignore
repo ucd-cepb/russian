@@ -50,3 +50,5 @@ rsconnect/
 
 # Confidential files
 confidential_data/
+scripts/data_processing/
+scripts/00_ergm_walkthrough.png
