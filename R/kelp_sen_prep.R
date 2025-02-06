@@ -165,9 +165,9 @@ interact %>% filter(response_id %in% (interact %>%
   group_by(response_id, is_other) %>% 
   summarise(n=n()) %>% pivot_wider(names_from=is_other, values_from=n) # they do!
 
-# View(interact %>% filter(response_id %in% (interact %>%
-#                                         filter(interact_type=="Other:") %>% pull(response_id))) %>%
-#   filter(interact_type != "Other:"))
+View(interact %>% filter(response_id %in% (interact %>%
+                                        filter(interact_type=="Other:") %>% pull(response_id))) %>%
+  filter(interact_type != "Other:"))
 
 
 ## first-order interactions
