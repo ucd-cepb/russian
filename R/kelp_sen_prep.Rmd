@@ -56,6 +56,9 @@ survey_dat <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv'))
 ## social - county network
 county.net <- read_csv(here('confidential_data','intermediate','kelp_by_org_by_CAcounty_2025-02-04.csv'))
 
+## social - interaction / involvement type
+interact.net <- read_csv(here('confidential_data','intermediate','kelp_by_org_by_interact_2025-02-05.csv')) 
+
 ```
 
 
@@ -105,28 +108,6 @@ info %>%
   group_by(response_id) %>% summarise(n_sources=length(unique(info_type))) %>%
   ggplot(aes(x=n_sources)) +
   geom_bar() + labs(y='n_respondents', caption="What are the main ways \nyou learn about kelp forest-related issues?") +
-  theme_bw()
-```
-
-Is there a relationship between information source and level of involvement? not really... even those only occasionally involved in kelp forest-related issues collect or analyze data.
-```{r}
-survey_dat %>% dplyr::select(response_id, q1) %>%
-  right_join(info,by='response_id') %>%
-  filter(!is.na(q1)) %>%
-  mutate(q1=case_when(
-    q1=='I am occasionally involved in kelp forest-related issues' ~ 'occasionally',
-    q1=='I am routinely involved in kelp forest-related issues' ~ 'routinely',
-    q1=='Kelp forest-related issues are the primary thing I am involved in' ~ 'primarily'
-  )) %>%
-  group_by(q1) %>% mutate(total_responses=length(unique(response_id))) %>%
-  ungroup() %>%
-  group_by(q1, total_responses, info_type) %>% summarise(n_respondents=length(unique(response_id))) %>%
-  mutate(p_respondents=n_respondents/total_responses) %>%
-  filter(n_respondents > 2 & info_type != "Other:") %>%
-  ggplot(aes(x=p_respondents, y=fct_reorder(info_type, p_respondents))) +
-  geom_col() + 
-  facet_wrap(~fct_relevel(q1, c('occasionally','routinely','primarily'))) +
-  labs(y="What are the main ways \nyou learn about kelp forest-related issues?") +
   theme_bw()
 ```
 
@@ -197,11 +178,37 @@ survey_dat %>% dplyr::select(response_id, q1) %>%
 
  What is the response rate and variation in response for the Question 8 Likert Scale questions on transformation? Variation in response among individuals from the same organization?  <-- is this a useful actor attribute to explore bonding v. bridging 
 
-## Revisit Q1
-
-Can we combine information source with level of involvement or involvement type?
 
 
+## Type of involvement
+
+Survey Question: Which words or phrases best describe your involvement in kelp forest-related issues?
+
+
+What is the **response rate?**
+```{r}
+length(unique(interact.net$response_id[which(!is.na(interact.net$interact_type))]))/length(unique(interact.net$response_id))
+```
+
+What is the **response rate among those who provided location information?**
+```{r}
+length(unique(interact.net %>% filter(response_id %in% county.net$response_id) %>%
+  filter(!is.na(interact_type)) %>%
+  pull(response_id))) / length(unique(county.net$response_id))
+```
+
+ 
+What is the variation in how respondents are involved in kelp issues (tourism, research, etc)?  <-- is this a useful actor attribute to explore bonding v. bridging 
+```{r}
+interact.net %>%
+  filter(!is.na(interact_type) & interact_type != 'Other:') %>%
+  ggplot(aes(x=interact_type)) + 
+  geom_bar() + 
+  theme_bw() + coord_flip()
+```
+
+
+ 
 ## County Connections
 
 Are any counties *not* connected by people who are primarily involved in kelp forest-related issues?
@@ -270,8 +277,38 @@ Whew highly connected network... the only counties without the same people / org
 the social network density between biologically connected counties will be 1. Will probably want to be able to look at strength of ties, not just presence / absence, or break down the actor types. 
 
 
-## Including Plots
+## Revisit Q1
 
-```{r pressure, echo=TRUE}
-plot(pressure)
+Can we combine information source with level of involvement or involvement type?
+
+### level involved
+
+Is there a relationship between information source and level of involvement? not really... even those only occasionally involved in kelp forest-related issues collect or analyze data.
+```{r}
+survey_dat %>% dplyr::select(response_id, q1) %>%
+  right_join(info,by='response_id') %>%
+  filter(!is.na(q1)) %>%
+  mutate(q1=case_when(
+    q1=='I am occasionally involved in kelp forest-related issues' ~ 'occasionally',
+    q1=='I am routinely involved in kelp forest-related issues' ~ 'routinely',
+    q1=='Kelp forest-related issues are the primary thing I am involved in' ~ 'primarily'
+  )) %>%
+  group_by(q1) %>% mutate(total_responses=length(unique(response_id))) %>%
+  ungroup() %>%
+  group_by(q1, total_responses, info_type) %>% summarise(n_respondents=length(unique(response_id))) %>%
+  mutate(p_respondents=n_respondents/total_responses) %>%
+  filter(n_respondents > 2 & info_type != "Other:") %>%
+  ggplot(aes(x=p_respondents, y=fct_reorder(info_type, p_respondents))) +
+  geom_col() + 
+  facet_wrap(~fct_relevel(q1, c('occasionally','routinely','primarily'))) +
+  labs(y="What are the main ways \nyou learn about kelp forest-related issues?") +
+  theme_bw()
 ```
+
+
+### type of involvement
+
+Are certain interaction types linked to ways in which people get kelp info?
+
+
+
