@@ -3,6 +3,7 @@ title: "Explore survey data for SEN"
 output: 
   html_document:
     toc: yes
+    toc_float: yes
 ---
 
 **author: Mary Fisher**
@@ -16,19 +17,28 @@ Explore the survey data as prep for SEN research questions. Particularly interes
 
 1. Which organizations have individual responses by people who directly observe kelp, and/or collect and analyze data? Can I link these organizations to specific restoration sites within counties? <-- set scale of SEN
 
-2. What is the variation in responses on level of involvement in kelp forest issues – primarily, routinely, rarely <-- usefulness of exploring existing / potential fit
+2. What is the response rate and variation in how respondents are involved in kelp issues (tourism, research, etc)? <-- set scale of SEN; is this a useful actor attribute to explore bonding v. bridging?
 
-3. What is the response rate and variation in how respondents are involved in kelp issues (tourism, research, etc)? Are certain involvement types linked to certain levels of involvement, or ways in which people get kelp info? <-- is this a useful actor attribute to explore bonding v. bridging 
+3. What is the variation in responses on level of involvement in kelp forest issues – primarily, routinely, rarely <-- usefulness of exploring existing / potential fit
 
-4. What is the response rate and variation in response for the Question 8 Likert Scale questions on transformation? Variation in response among individuals from the same organization?  <-- is this a useful actor attribute to explore bonding v. bridging 
+4. Are there combinations of 1-3 that can help specify who is on the water for scale-setting?
 
-5. Revisit Q1: Can we combine information source with level of involvement or involvement type?
+5. What is the response rate and variation in response for the Question 8 Likert Scale questions on transformation? Variation in response among individuals from the same organization?  <-- is this a useful actor attribute to explore bonding v. bridging 
 
 6. Are any counties *not* connected by people who are primarily involved in kelp forest-related issues?
 
 
+#### What did we learn?
+
+Response rates on how / how frequently people engage with kelp related issues are high, and at 100% for those who also provided county info. Same goes for how people get information on kelp related issues. 
+
+Most people selected 2+ answers for how they are involved / how they get information. Almost everyone said that they either collect and analyze data OR directly observe change. 
+
+There is a good range for people who are rarely --> primarily involved in kelp related issues. 
+
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, messages=FALSE)
 
 # Set up  -----------------------------------------------------------------
 library(readr)
@@ -42,10 +52,11 @@ library(janitor)
 library(ergm)
 library(sna) 
 library(igraph)
-
+#
+source(here('R','subfxn','fill_adjacency_matrix.R'))
 # Data --------------------------------------------------------------------
 ## social network (processed)
-kelp.edge <- read_csv(here('confidential_data','intermediate','kelp_social_by_org_2025-02-04.csv'))
+kelp.edge <- read_csv(here('confidential_data','processed','kelp_social_by_org_2025-02-04.csv'))
 
 
 ## survey data
@@ -54,20 +65,20 @@ survey_dat <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv'))
   slice(-c(1:2))
 
 ## social - county network
-county.net <- read_csv(here('confidential_data','intermediate','kelp_by_org_by_CAcounty_2025-02-04.csv'))
+county.net <- read_csv(here('confidential_data','processed','kelp_by_org_by_CAcounty_2025-02-04.csv'))
 
 ## social - interaction / involvement type
-interact.net <- read_csv(here('confidential_data','intermediate','kelp_by_org_by_interact_2025-02-05.csv')) 
+interact.net <- read_csv(here('confidential_data','processed','kelp_by_org_by_interact_2025-02-05.csv')) 
 
 ```
 
 
 
-## Information Source
+## 1. Information Source
 
 **Survey question: "What are the main ways you learn about kelp forest-related issues?"**
 
-Goal is to use the answer to this response to identify organizations / sites where people are actively in the water monitoring conditions and/or engaging in restoration. 
+Can I use the answer to this question to identify organizations / sites where people are actively in the water monitoring conditions and/or engaging in restoration? This will help set the scale of the SEN. 
 
 What is the **response rate?**
 ```{r}
@@ -93,6 +104,7 @@ length(unique(filter(info, info_type != "no response")$response_id))/length(uniq
 ```
 
 Take a look at the different responses (only those with 3+ responses shown here). Lots of individuals directly observe conditions, a slightly smaller number collect and analyze data.
+
 ```{r}
 info %>%
   group_by(info_type) %>% summarise(n_respondents=length(unique(response_id))) %>%
@@ -103,6 +115,7 @@ info %>%
 ```
 
 Lots of people also chose 2+ responses to this question. 
+
 ```{r}
 info %>%
   group_by(response_id) %>% summarise(n_sources=length(unique(info_type))) %>%
@@ -114,6 +127,7 @@ info %>%
 How many organizations do I have to track down, to link to specific sites within counties?
 
 For people who collect or analyze data, conduct restoration (an 'other' response), use kelp for cultural activities (an 'other' response)?
+
 ```{r message=FALSE, warning=FALSE}
 ivec <- c("I collect or analyze data", "I actively do kelp restoration","Direct impact cultural uses", "I study my restoration projects")
 
@@ -123,27 +137,130 @@ orgs_1od <- info %>%
   group_by(org_name) %>% summarise(n=length(unique(response_id))) %>%
   # filter(n > 2) %>%   # un-hash for 3+ responses
   pull(org_name)
-orgs_1od
+length(orgs_1od)
 ```
 
 
-For people who directly observe conditions?
+For organizations with people who (only) directly observe conditions?
+
 ```{r message=FALSE, warning=FALSE}
 ivec <- c("I directly observe conditions")
 
 ## orgs 2 plus people 
-info %>%
+length( info %>%
   filter(info_type %in% ivec) %>%
   left_join(kelp.edge %>% dplyr::select(response_id,org_name) %>% distinct()) %>%
   group_by(org_name) %>% summarise(n=length(unique(response_id))) %>%
   # filter(n > 2) %>%
   filter(!(org_name %in% orgs_1od)) %>%
-  pull(org_name)
+  pull(org_name))
 ```
 
-## Level of involvement
 
-Survey Question: Which of the following statements best matches your level of involvement in kelp forest-related issues (including harvesting, management, advocacy, research, cultural uses, etc) in California?
+
+## 2. Type of involvement
+
+**Survey Question: Which words or phrases best describe your involvement in kelp forest-related issues?**
+
+### a. scale-setting
+
+Can I use the answer to this question to identify organizations / sites where people are actively in the water monitoring conditions and/or engaging in restoration? This will help set the scale of the SEN. 
+
+What is the **response rate?** Lower than information source.
+```{r}
+length(unique(interact.net$response_id))/length(unique(survey_dat$response_id))
+```
+
+What is the **response rate among those who provided location information?**  
+```{r}
+length(unique(interact.net %>% filter(response_id %in% county.net$response_id) %>%
+  filter(!is.na(interact_type)) %>%
+  pull(response_id))) / length(unique(county.net$response_id))
+```
+
+What is the variation in how respondents are involved in kelp issues (tourism, research, etc)?  <-- is this a useful actor attribute to explore bonding v. bridging 
+```{r}
+interact.net %>%
+  separate(interact_type, into=c("interact_type0","interact_text"), sep=":", remove=FALSE, fill='right') %>%
+  ggplot(aes(x=interact_type0)) + 
+  geom_bar() + 
+  theme_bw() + coord_flip()
+```
+
+Most individuals chose 2+ ways of being involved. 
+```{r}
+interact.net %>%
+  separate(interact_type, into=c("interact_type0","interact_text"), sep=":", remove=FALSE, fill='right') %>%
+  group_by(response_id) %>% summarise(n_types=length(unique(interact_type0))) %>%
+  ggplot(aes(x=n_types)) +
+  geom_bar() + labs(y='n_respondents', caption="Which words or phrases best describe\n your involvement in kelp forest-related issues?") +
+  theme_bw()
+```
+
+What proportion of individuals chose Restoration, Research, Harvesting/Fishing/Growing, or Recreation?
+```{r}
+ids_1od <- interact.net %>%
+  separate(interact_type, into=c("interact_type0","interact_text"), sep=":", remove=FALSE, fill='right') %>%
+  filter(grepl('Restoration|restoration', interact_type0) | interact_type0 %in% c("Research","Harvesting or fishing or growing", "Recreation or Tourism"))
+
+length(unique(ids_1od$response_id)) / length(unique(interact.net$response_id))
+```
+
+How many organizations do I have to track down, to link to specific sites within counties?
+```{r message=FALSE, warning=FALSE}
+length(ids_1od %>%
+  group_by(org_name) %>% summarise(n=length(unique(response_id))) %>%
+  # filter(n > 2) %>%   # un-hash for 3+ responses
+  pull(org_name))
+```
+
+More organizations than when I used information source (32). Is this every organization in the survey?
+```{r}
+all(ids_1od %>%
+  group_by(org_name) %>% summarise(n=length(unique(response_id))) %>%
+  # filter(n > 2) %>%   # un-hash for 3+ responses
+  pull(org_name) %in% interact.net$org_name)
+```
+
+### b. is this a useful actor attribute to explore bonding v. bridging?
+
+Which activities are commonly cited by the same individual? I've removed the singular responses to make it easier to see the other responses. 
+
+```{r}
+tmp_df <- interact.net %>%
+  separate(interact_type, into=c("interact_type0","interact_text"), sep=":", remove=FALSE, fill='right') %>%
+  filter(!grepl("(NGO)",interact_type0) & !grepl("gametophyte",interact_type0) & !grepl('Restoration|restoration', interact_type0)) %>%
+  dplyr::select(response_id, interact_type0) %>% rename(id=response_id, v=interact_type0)
+A <- fill_adjacency_matrix(network_data=tmp_df, self=TRUE)
+
+g <- graph_from_adjacency_matrix(A, mode="undirected", diag=FALSE, weighted=TRUE)
+plot(g, layout=layout_with_fr, edge.width=E(g)$weight/max(E(g)$weight)*10)
+
+A
+```
+
+Which activities commonly take place within the same organization? I've removed the singular responses to make it easier to see the other responses. Research is commonly done in combination with other activities. 
+
+```{r}
+tmp_df <- interact.net %>%
+  separate(interact_type, into=c("interact_type0","interact_text"), sep=":", remove=FALSE, fill='right') %>%
+  filter(!grepl("(NGO)",interact_type0) & !grepl("gametophyte",interact_type0) & !grepl('Restoration|restoration', interact_type0)) %>%
+  dplyr::select(org_name, interact_type0) %>% distinct() %>% rename(id=org_name, v=interact_type0) %>%
+  filter(!is.na(id))
+A <- fill_adjacency_matrix(network_data=tmp_df, self=TRUE)
+
+g <- graph_from_adjacency_matrix(A, mode="undirected", diag=FALSE, weighted=TRUE)
+plot(g, layout=layout_with_fr, edge.width=E(g)$weight/max(E(g)$weight)*10)
+
+A
+```
+ 
+
+## 3. Level of involvement
+
+**Survey Question: Which of the following statements best matches your level of involvement in kelp forest-related issues (including harvesting, management, advocacy, research, cultural uses, etc) in California?**
+
+There should be variation in level of involvement to make it an interesting way to subset the network to explore existing v potential fit
 
 What is the **response rate?**
 ```{r}
@@ -175,41 +292,161 @@ survey_dat %>% dplyr::select(response_id, q1) %>%
 ```
 
 
+### 4. Combine 1-3 for scale-setting
 
- What is the response rate and variation in response for the Question 8 Likert Scale questions on transformation? Variation in response among individuals from the same organization?  <-- is this a useful actor attribute to explore bonding v. bridging 
+Are there combinations of 1-3 that can help specify who is on the water for scale-setting?
 
+#### involvement type x level of involvement
 
-
-## Type of involvement
-
-Survey Question: Which words or phrases best describe your involvement in kelp forest-related issues?
-
-
-What is the **response rate?**
 ```{r}
-length(unique(interact.net$response_id[which(!is.na(interact.net$interact_type))]))/length(unique(interact.net$response_id))
+survey_dat %>% dplyr::select(response_id, q1) %>%
+  right_join(interact.net,by='response_id') %>%
+  filter(!is.na(q1)) %>%
+  mutate(q1=case_when(
+    q1=='I am occasionally involved in kelp forest-related issues' ~ 'occasionally',
+    q1=='I am routinely involved in kelp forest-related issues' ~ 'routinely',
+    q1=='Kelp forest-related issues are the primary thing I am involved in' ~ 'primarily'
+  )) %>%
+  group_by(q1) %>% mutate(total_responses=length(unique(response_id))) %>%
+  ungroup() %>%
+  separate(interact_type, into=c("interact_type0","interact_text"), sep=":", remove=FALSE, fill='right') %>%
+  group_by(q1, total_responses, interact_type0) %>% summarise(n_respondents=length(unique(response_id))) %>%
+  mutate(p_respondents=n_respondents/total_responses) %>%
+  ggplot(aes(x=p_respondents, y=fct_reorder(interact_type0, p_respondents))) +
+  geom_col() + 
+  facet_wrap(~fct_relevel(q1, c('occasionally','routinely','primarily'))) +
+  labs(y="Which words or phrases best describe\n your involvement in kelp forest-related issues?") +
+  theme_bw()
 ```
 
-What is the **response rate among those who provided location information?**
 ```{r}
-length(unique(interact.net %>% filter(response_id %in% county.net$response_id) %>%
-  filter(!is.na(interact_type)) %>%
-  pull(response_id))) / length(unique(county.net$response_id))
+survey_dat %>% dplyr::select(response_id, q1) %>%
+  right_join(interact.net,by='response_id') %>%
+  filter(!is.na(q1)) %>%
+  mutate(q1=case_when(
+    q1=='I am occasionally involved in kelp forest-related issues' ~ 'occasionally',
+    q1=='I am routinely involved in kelp forest-related issues' ~ 'routinely',
+    q1=='Kelp forest-related issues are the primary thing I am involved in' ~ 'primarily'
+  )) %>%
+  separate(interact_type, into=c("interact_type0","interact_text"), sep=":", remove=FALSE, fill='right') %>%
+  group_by(interact_type0) %>% mutate(total_responses=length(unique(response_id))) %>%
+  ungroup() %>%
+  group_by(q1, total_responses, interact_type0) %>% summarise(n_respondents=length(unique(response_id))) %>%
+  mutate(p_respondents=n_respondents/total_responses) %>%
+  ggplot(aes(y=p_respondents, x=fct_reorder(interact_type0, p_respondents), fill=fct_relevel(q1, c('occasionally','routinely','primarily')))) +
+  geom_col() + 
+  scale_fill_manual(values=rev(c('forestgreen','aquamarine3', 'lightblue')), name='level of\n involvement') +
+  labs(x="Which words or phrases best describe\n your involvement in kelp forest-related issues?") +
+  theme_bw() + theme(axis.text.x=element_text(angle=45,hjust=1))
 ```
 
- 
-What is the variation in how respondents are involved in kelp issues (tourism, research, etc)?  <-- is this a useful actor attribute to explore bonding v. bridging 
+
+That's actually kind of interesting. But not super helpful for scale setting. 
+
+
+#### info source x level of involvement
+
+Could I use 'level of involvement' to limit my sample size of people who are directly interacting with kelp ecosystems? In other words, are some people who collect / analyze data, or who directly observe conditions, only occasionally involved in kelp forest related issues?
+
 ```{r}
-interact.net %>%
-  filter(!is.na(interact_type) & interact_type != 'Other:') %>%
-  ggplot(aes(x=interact_type)) + 
-  geom_bar() + 
-  theme_bw() + coord_flip()
+info_level <- survey_dat %>% dplyr::select(response_id, q1) %>%
+  right_join(info,by='response_id') %>%
+  filter(!is.na(q1)) %>%
+  mutate(q1=case_when(
+    q1=='I am occasionally involved in kelp forest-related issues' ~ 'occasionally',
+    q1=='I am routinely involved in kelp forest-related issues' ~ 'routinely',
+    q1=='Kelp forest-related issues are the primary thing I am involved in' ~ 'primarily'
+  )) %>%
+  group_by(info_type) %>% mutate(total_responses=length(unique(response_id))) 
+
+info_level %>%
+  ungroup() %>%
+  group_by(q1, total_responses, info_type) %>% summarise(n_respondents=length(unique(response_id))) %>%
+  filter(n_respondents > 1 & info_type != "Other:") %>%
+  mutate(p_respondents=n_respondents/total_responses) %>%
+  ggplot(aes(y=p_respondents, x=fct_reorder(info_type, p_respondents), fill=fct_relevel(q1, c('occasionally','routinely','primarily')))) +
+  geom_col() + 
+  scale_fill_manual(values=rev(c('forestgreen','aquamarine3', 'lightblue')), name='level of\n involvement') +
+  labs(x="What are the main ways \nyou learn about kelp forest-related issues?") +
+  theme_bw() + theme(axis.text.x=element_text(angle=45,hjust=1))
+```
+
+Answer is yes, there are a handful of respondents in these 'first order' information categories we could potentially leave out. What proportion of the 'direct interaction' information group are only occasionally involved in kelp forest-related issues?
+
+```{r}
+info1d <- c("I collect or analyze data", "I actively do kelp restoration", "I study my restoration projects")
+info2d <- c("Direct impact cultural uses","I directly observe conditions")
+
+to_remove <- info_level %>% filter(q1=="occasionally" & !(info_type %in% c(info1d,info2d)))
+
+length(unique(to_remove$response_id))/length(unique(info$response_id[which(!(info$info_type %in% c(info1d, info2d)))]))
+```
+
+But do they represent unique organizations? Yes, 7 orgs. 
+```{r}
+to_keep <- info_level %>% filter(!(response_id %in% to_remove$response_id)) %>%
+  left_join(kelp.edge %>% dplyr::select(response_id,org_name) %>% distinct(), by='response_id')
+length(unique(to_remove %>% 
+  left_join(kelp.edge %>% dplyr::select(response_id,org_name) %>% distinct(), by='response_id') %>% 
+  filter(!(org_name %in% to_keep$org_name)) %>%
+  pull(org_name)))
+```
+
+---------------------------- stopped here 2/7/2025 ----------------------------
+
+#### info source x involvement type
+
+Ok, I'm hoping this is the interesting one. My main question is whether I can reduce my sample size of 
+
+As before, I'm grouping information responses as:
+```{r echo=TRUE}
+info1d <- c("I collect or analyze data", "I actively do kelp restoration", "I study my restoration projects")
+info2d <- c("Direct impact cultural uses","I directly observe conditions")
 ```
 
 
- 
-## County Connections
+Because people could choose more than one response, I'm going to limit them to whichever comes first: data / restoration, direct observation / use, other.
+
+People can also choose more than one way of being involved. I'm going to group involvement types by 'in water potential:'
+```{r}
+
+```
+
+
+
+```{r}
+interact.info.net <- left_join(interact.net, info, by='response_id')
+
+info %>%
+  mutate(info_group=ifelse(info_type %in% info1d, 1,
+                           ifelse(info_type %in% info2d, 2,3))) %>%
+  group_by(response_id) %>% slice_min(info_group) %>% dplyr::select(-info_type) %>% distinct() %>%
+  left_join(interact.net, by='response_id') %>%
+  separate(interact_type, into=c("interact_type0","interact_text"), sep=":", remove=FALSE, fill='right') %>%
+  mutate(info_group=case_when(info_group==1 ~ 'data, restoration',
+                              info_group==2 ~ 'direct observation',
+                              info_group==3 ~ 'other')) %>%
+  group_by(interact_type0) %>% mutate(total=length(unique(response_id))) %>%
+  ungroup() %>%
+  group_by(interact_type0, total, info_group) %>% summarise(n=length(unique(response_id))) %>%
+  mutate(p_respondents=n/total) %>%
+  ggplot(aes(x=interact_type0, y=p_respondents, fill=info_group)) + 
+  geom_col() +
+  scale_fill_manual(values=rev(c('darkblue','lightskyblue3', 'lightblue1')), name='info source') +
+  theme_bw() + theme(axis.text.x=element_text(angle=45,hjust=1))
+```
+
+It looks like adding in the 
+
+
+
+## 5. Transformation Qs
+
+What is the response rate and variation in response for the Question 8 Likert Scale questions on transformation? Variation in response among individuals from the same organization?  <-- is this a useful actor attribute to explore bonding v. bridging 
+
+
+
+## 6. County Connections
 
 Are any counties *not* connected by people who are primarily involved in kelp forest-related issues?
 ```{r}
@@ -221,24 +458,13 @@ primary.county.net <- filter(county.net, grepl('primary',q1))
 
 Same person working across multiple counties:
 ```{r warning=FALSE}
-A <- matrix(data=0, nrow=length(unique(primary.county.net$county))-1, ncol=length(unique(primary.county.net$county))-1)
-row.names(A) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
-colnames(A) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
 
-for(i in 1:dim(A)[1]){
-  idat <- primary.county.net %>% filter(county==row.names(A)[i])
-  for(j in 1:dim(A)[2]){
-    if(i!=j){
-      n <- length(unique(primary.county.net %>% 
-                           filter(response_id %in% idat$response_id) %>%
-                           filter(county==colnames(A)[j]) %>%
-                           pull(response_id)) )
-      A[i,j] <- n
-      
-        
-    }
-  }
-}
+tmpA <- matrix(data=0, nrow=length(unique(primary.county.net$county))-1, ncol=length(unique(primary.county.net$county))-1)
+row.names(tmpA) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
+colnames(tmpA) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
+
+A <- fill_adjacency_matrix(network_data=dplyr::select(primary.county.net, response_id, county) %>% rename(id=response_id, v=county), empty_A=tmpA, self=FALSE)
+
 g <- graph_from_adjacency_matrix(A, mode="undirected")
 plot(g, layout=layout_with_fr)
 
@@ -276,39 +502,6 @@ A
 Whew highly connected network... the only counties without the same people / orgs working between them involve Ventura, San Mateo, and San Luis Obispo. 
 the social network density between biologically connected counties will be 1. Will probably want to be able to look at strength of ties, not just presence / absence, or break down the actor types. 
 
-
-## Revisit Q1
-
-Can we combine information source with level of involvement or involvement type?
-
-### level involved
-
-Is there a relationship between information source and level of involvement? not really... even those only occasionally involved in kelp forest-related issues collect or analyze data.
-```{r}
-survey_dat %>% dplyr::select(response_id, q1) %>%
-  right_join(info,by='response_id') %>%
-  filter(!is.na(q1)) %>%
-  mutate(q1=case_when(
-    q1=='I am occasionally involved in kelp forest-related issues' ~ 'occasionally',
-    q1=='I am routinely involved in kelp forest-related issues' ~ 'routinely',
-    q1=='Kelp forest-related issues are the primary thing I am involved in' ~ 'primarily'
-  )) %>%
-  group_by(q1) %>% mutate(total_responses=length(unique(response_id))) %>%
-  ungroup() %>%
-  group_by(q1, total_responses, info_type) %>% summarise(n_respondents=length(unique(response_id))) %>%
-  mutate(p_respondents=n_respondents/total_responses) %>%
-  filter(n_respondents > 2 & info_type != "Other:") %>%
-  ggplot(aes(x=p_respondents, y=fct_reorder(info_type, p_respondents))) +
-  geom_col() + 
-  facet_wrap(~fct_relevel(q1, c('occasionally','routinely','primarily'))) +
-  labs(y="What are the main ways \nyou learn about kelp forest-related issues?") +
-  theme_bw()
-```
-
-
-### type of involvement
-
-Are certain interaction types linked to ways in which people get kelp info?
 
 
 
