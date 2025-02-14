@@ -13,28 +13,32 @@ output:
 
 ## Description
 
-Explore the survey data as prep for SEN research questions. Particularly interested in: 
+Explore the survey data as prep for SEN research questions (analyzing fit - what scale; analyzing homophily, social capital in sn - what attributes). Particularly interested in: 
 
-1. Which organizations have individual responses by people who directly observe kelp, and/or collect and analyze data? Can I link these organizations to specific restoration sites within counties? <-- set scale of SEN
+1. How connected are counties by people who are primarily involved in kelp forest-related issues? <-- set scale of SEN
 
-2. What is the response rate and variation in how respondents are involved in kelp issues (tourism, research, etc)? <-- set scale of SEN; is this a useful actor attribute to explore bonding v. bridging?
+2. Which organizations have individual responses by people who directly observe kelp, and/or collect and analyze data (info type)? Can I link these organizations to specific restoration sites within counties? <-- set scale of SEN
 
-3. What is the variation in responses on level of involvement in kelp forest issues – primarily, routinely, rarely <-- usefulness of exploring existing / potential fit
+3. What is the response rate and variation in how respondents are involved in kelp issues (tourism, research, etc)? <-- set scale of SEN; is this a useful actor attribute to explore capital
 
-4. Are there combinations of 1-3 that can help specify who is on the water for scale-setting?
+4. What is the variation in responses on level of involvement in kelp forest issues (primarily, routinely, rarely) <-- set scale of SEN
 
-5. What is the response rate and variation in response for the Question 8 Likert Scale questions on transformation? Variation in response among individuals from the same organization?  <-- is this a useful actor attribute to explore bonding v. bridging 
+5. Are there combinations of 1-3 that can help specify who is on the water for scale-setting? (info x involvement type x level involved)
 
-6. Are any counties *not* connected by people who are primarily involved in kelp forest-related issues?
+6. What is the response rate and variation in response for the Question 8 Likert Scale questions on transformation? Variation in response among individuals from the same organization?  <-- is this a useful actor attribute to explore capital 
 
 
-#### What did we learn?
+
+#### Notes
 
 Response rates on how / how frequently people engage with kelp related issues are high, and at 100% for those who also provided county info. Same goes for how people get information on kelp related issues. 
 
-Most people selected 2+ answers for how they are involved / how they get information. Almost everyone said that they either collect and analyze data OR directly observe change. 
+Most people selected 2+ answers for how they are involved / how they get information. Almost everyone said that they either collect and analyze data OR directly observe change. Individuals who both collect and analyze data and directly observe change represent 33 organizations (out of 54 total)
 
 There is a good range for people who are rarely --> primarily involved in kelp related issues. 
+
+Question 8 on  goals, riskiness of restoration had 66-69% response rate. Some questions had most respondents agreeing / disagreeing, although there was some variation among individuals belonging to certain organizations. The questions with the most varation...
+Maybe the organization-level attribute here would be *majority* disagree / agree / don't know?
 
 
 ```{r setup, include=FALSE}
@@ -49,11 +53,11 @@ library(here)
 library(magrittr)
 library(janitor)
 #
-library(ergm)
-library(sna) 
 library(igraph)
+library(bipartite)
 #
 source(here('R','subfxn','fill_adjacency_matrix.R'))
+source(here('R','subfxn','fill_bipartite_adjacency_matrix.R'))
 # Data --------------------------------------------------------------------
 ## social network (processed)
 kelp.edge <- read_csv(here('confidential_data','processed','kelp_social_by_org_2025-02-04.csv'))
@@ -63,6 +67,8 @@ kelp.edge <- read_csv(here('confidential_data','processed','kelp_social_by_org_2
 survey_dat <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv')) %>%
   clean_names() %>%
   slice(-c(1:2))
+## remove non-CA respondents. ## counties q was number 5
+survey_dat %<>% filter(!(q5_17_text %in% c("Baja California","Ensenada, Mexico")))
 
 ## social - county network
 county.net <- read_csv(here('confidential_data','processed','kelp_by_org_by_CAcounty_2025-02-04.csv'))
@@ -74,7 +80,81 @@ interact.net <- read_csv(here('confidential_data','processed','kelp_by_org_by_in
 
 
 
-## 1. Information Source
+
+## 1. County Connections
+
+Are any counties *not* connected by **people who are primarily involved in kelp forest-related issues?**
+
+### count connections
+
+```{r}
+county.net %<>% 
+  left_join(survey_dat %>% dplyr::select(response_id, q1),by='response_id')
+
+primary.county.net <- filter(county.net, grepl('primary',q1))
+```
+
+
+How many inter-county connections just from looking at the same person working in multiple counties? (total counties: 15)
+
+```{r warning=FALSE}
+
+tmpA <- matrix(data=0, nrow=length(unique(primary.county.net$county))-1, ncol=length(unique(primary.county.net$county))-1)
+row.names(tmpA) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
+colnames(tmpA) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
+
+A <- fill_adjacency_matrix(network_data=dplyr::select(primary.county.net, response_id, county) %>% rename(id=response_id, v=county), empty_A=tmpA, self=FALSE, weight=FALSE)
+
+g <- graph_from_adjacency_matrix(A, mode="undirected")
+plot(g, layout=layout_in_circle)
+
+igraph::strength(g)
+```
+
+
+How many inter-county connections just from looking at the same organization working in multiple counties? (total counties: 15)
+
+```{r warning=FALSE}
+A <- matrix(data=0, nrow=length(unique(primary.county.net$county))-1, ncol=length(unique(primary.county.net$county))-1)
+row.names(A) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
+colnames(A) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
+
+A <- fill_adjacency_matrix(network_data=dplyr::select(primary.county.net, org_name, county) %>% distinct() %>% rename(id=org_name, v=county), empty_A=tmpA, self=FALSE, weight=FALSE)
+
+g <- graph_from_adjacency_matrix(A, mode="undirected")
+plot(g, layout=layout_with_fr)
+
+igraph::strength(g)
+```
+
+
+
+### bipartite plot
+
+Just for fun...
+```{r}
+A <- matrix(data=0, nrow=length(unique(primary.county.net$county))-1, ncol=length(unique(primary.county.net$org_name)))
+row.names(A) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
+colnames(A) <- unique(primary.county.net$org_name)
+
+A <- fill_bipartite_adjacency_matrix(network_data=dplyr::select(primary.county.net, org_name, county) %>% distinct() %>% rename(v2=org_name, v1=county), empty_A=A)
+
+bipartite::plotweb(A, col.high='cadetblue4',col.low='forestgreen')
+```
+
+
+
+Whew highly connected network... the only county pairs without the same people / orgs working between them involve Ventura, San Mateo, and San Luis Obispo. 
+the social network density between biologically connected counties will be 1. Will probably want to:
+
+- be able to look at strength of ties, not just presence / absence (number of orgs collaborating, or something)
+
+- break down the actor types beyond degree of participation in kelp-related issues
+
+- build finer-scale ecological network
+
+
+## 2. Information Source
 
 **Survey question: "What are the main ways you learn about kelp forest-related issues?"**
 
@@ -126,10 +206,11 @@ info %>%
 
 How many organizations do I have to track down, to link to specific sites within counties?
 
-For people who collect or analyze data, conduct restoration (an 'other' response), use kelp for cultural activities (an 'other' response)?
+Two groups I'm interested: (1) people who collect or analyze data, conduct restoration (an 'other' response), use kelp for cultural activities (an 'other' response), (2) people who directly observe conditions.
 
 ```{r message=FALSE, warning=FALSE}
 ivec <- c("I collect or analyze data", "I actively do kelp restoration","Direct impact cultural uses", "I study my restoration projects")
+ivec2 <- c("I directly observe conditions")
 
 orgs_1od <- info %>%
   filter(info_type %in% ivec) %>%
@@ -137,18 +218,37 @@ orgs_1od <- info %>%
   group_by(org_name) %>% summarise(n=length(unique(response_id))) %>%
   # filter(n > 2) %>%   # un-hash for 3+ responses
   pull(org_name)
-length(orgs_1od)
+a1 <- length(orgs_1od)
+orgs_2od <- info %>%
+  filter(info_type %in% ivec2) %>%
+  left_join(kelp.edge %>% dplyr::select(response_id,org_name) %>% distinct()) %>%
+  group_by(org_name) %>% summarise(n=length(unique(response_id))) %>%
+  # filter(n > 2) %>%   # un-hash for 3+ responses
+  pull(org_name)
+a2 <- length (orgs_2od)
 ```
 
 
-For organizations with people who (only) directly observe conditions?
+Number of organizations for....
+
+(a) people in group 1: `r a1`
+
+(b) people in group 2: `r a2`
 
 ```{r message=FALSE, warning=FALSE}
-ivec <- c("I directly observe conditions")
-
-## orgs 2 plus people 
-length( info %>%
+# (c) only data
+a3 <- length( info %>%
   filter(info_type %in% ivec) %>%
+  left_join(kelp.edge %>% dplyr::select(response_id,org_name) %>% distinct()) %>%
+  group_by(org_name) %>% summarise(n=length(unique(response_id))) %>%
+  # filter(n > 2) %>%
+  filter(!(org_name %in% orgs_2od)) %>%
+  pull(org_name))
+
+# (d) 
+## For people who (only) directly observe conditions?
+a4 <- length( info %>%
+  filter(info_type %in% ivec2) %>%
   left_join(kelp.edge %>% dplyr::select(response_id,org_name) %>% distinct()) %>%
   group_by(org_name) %>% summarise(n=length(unique(response_id))) %>%
   # filter(n > 2) %>%
@@ -156,9 +256,31 @@ length( info %>%
   pull(org_name))
 ```
 
+(c) people ONLY in group 1: `r a3`
+
+(d) people ONLY in group 2: `r a4`
+
+```{r message=FALSE, warning=FALSE}
+# (e) people who both collect or analyze data *and* directly observe conditions?
+a5 <- length(
+  info %>%
+    mutate(info_type=ifelse(info_type %in% ivec, 'data_restoration', info_type)) %>%
+    filter(info_type=='data_restoration' | (info_type %in% ivec2)) %>% mutate(tmp=1) %>%
+    distinct() %>%
+    pivot_wider(names_from=info_type, values_from=tmp) %>%
+    filter(!is.na(data_restoration) & !is.na(`I directly observe conditions`)) %>% dplyr::select(response_id) %>%
+    left_join(kelp.edge %>% dplyr::select(response_id,org_name) %>% distinct()) %>%
+    group_by(org_name) %>% summarise(n=length(unique(response_id))) %>%
+    # filter(n > 2) %>%   # un-hash for 3+ responses
+    pull(org_name)
+)
+```
+
+(e) people in both groups 1 and 2: `r a5`
 
 
-## 2. Type of involvement
+
+## 3. Type of involvement
 
 **Survey Question: Which words or phrases best describe your involvement in kelp forest-related issues?**
 
@@ -187,6 +309,7 @@ interact.net %>%
   theme_bw() + coord_flip()
 ```
 
+
 Most individuals chose 2+ ways of being involved. 
 ```{r}
 interact.net %>%
@@ -214,12 +337,12 @@ length(ids_1od %>%
   pull(org_name))
 ```
 
-More organizations than when I used information source (32). Is this every organization in the survey?
+More organizations than when I used information source. Is this every organization in the survey?
 ```{r}
-all(ids_1od %>%
+all((ids_1od %>%
   group_by(org_name) %>% summarise(n=length(unique(response_id))) %>%
   # filter(n > 2) %>%   # un-hash for 3+ responses
-  pull(org_name) %in% interact.net$org_name)
+  pull(org_name)) %in% interact.net$org_name)
 ```
 
 ### b. is this a useful actor attribute to explore bonding v. bridging?
@@ -234,9 +357,7 @@ tmp_df <- interact.net %>%
 A <- fill_adjacency_matrix(network_data=tmp_df, self=TRUE)
 
 g <- graph_from_adjacency_matrix(A, mode="undirected", diag=FALSE, weighted=TRUE)
-plot(g, layout=layout_with_fr, edge.width=E(g)$weight/max(E(g)$weight)*10)
-
-A
+plot(g, layout=layout_in_circle, edge.width=E(g)$weight/max(E(g)$weight)*10)
 ```
 
 Which activities commonly take place within the same organization? I've removed the singular responses to make it easier to see the other responses. Research is commonly done in combination with other activities. 
@@ -250,13 +371,20 @@ tmp_df <- interact.net %>%
 A <- fill_adjacency_matrix(network_data=tmp_df, self=TRUE)
 
 g <- graph_from_adjacency_matrix(A, mode="undirected", diag=FALSE, weighted=TRUE)
-plot(g, layout=layout_with_fr, edge.width=E(g)$weight/max(E(g)$weight)*10)
-
-A
+plot(g, layout=layout_in_circle, edge.width=E(g)$weight/max(E(g)$weight)*10)
 ```
- 
 
-## 3. Level of involvement
+Just for fun...
+```{r}
+A <- fill_bipartite_adjacency_matrix(network_data=tmp_df %>% rename(v1=id, v2=v))
+
+bipartite::plotweb(A, col.high='cadetblue4',col.low='forestgreen')
+```
+
+
+
+
+## 4. Level of involvement
 
 **Survey Question: Which of the following statements best matches your level of involvement in kelp forest-related issues (including harvesting, management, advocacy, research, cultural uses, etc) in California?**
 
@@ -268,7 +396,7 @@ survey_dat %>% dplyr::select(response_id, q1) %>%
   mutate(is.q1.na=ifelse(is.na(q1), 1,0)) %>%
   group_by(is.q1.na) %>% summarise(n_responses=length(unique(response_id))) %>%
   mutate(p_responses=n_responses/length(unique(survey_dat$response_id))) %>%
-  dplyr::select(is.q1.na, p_responses)
+  filter(is.q1.na==0) %>% pull(p_responses)
 ```
 
 What is the **response rate for those who provided location information?**
@@ -278,7 +406,7 @@ survey_dat %>% dplyr::select(response_id, q1) %>%
   mutate(is.q1.na=ifelse(is.na(q1), 1,0)) %>%
   group_by(is.q1.na) %>% summarise(n_responses=length(unique(response_id))) %>%
   mutate(p_responses=n_responses/length(unique(county.net$response_id))) %>%
-  dplyr::select(is.q1.na, p_responses)
+  filter(is.q1.na==0) %>% pull(p_responses)
 ```
 
 
@@ -292,7 +420,7 @@ survey_dat %>% dplyr::select(response_id, q1) %>%
 ```
 
 
-### 4. Combine 1-3 for scale-setting
+## 5. Combine 1-3 for scale-setting
 
 Are there combinations of 1-3 that can help specify who is on the water for scale-setting?
 
@@ -414,7 +542,7 @@ People can also choose more than one way of being involved. I'm going to group i
 
 
 
-```{r}
+```{r eval=FALSE}
 interact.info.net <- left_join(interact.net, info, by='response_id')
 
 info %>%
@@ -436,72 +564,127 @@ info %>%
   theme_bw() + theme(axis.text.x=element_text(angle=45,hjust=1))
 ```
 
-It looks like adding in the 
 
 
 
-## 5. Transformation Qs
+
+## 6. Transformation Qs
 
 What is the response rate and variation in response for the Question 8 Likert Scale questions on transformation? Variation in response among individuals from the same organization?  <-- is this a useful actor attribute to explore bonding v. bridging 
 
-
-
-## 6. County Connections
-
-Are any counties *not* connected by people who are primarily involved in kelp forest-related issues?
 ```{r}
-county.net %<>% 
-  left_join(survey_dat %>% dplyr::select(response_id, q1),by='response_id')
-
-primary.county.net <- filter(county.net, grepl('primary',q1))
+managing <-  survey_dat %>% 
+  dplyr::select(response_id, starts_with("q8"))
+  
+act <- dplyr::select(managing, response_id, q8_1, q8_2, q8_3) %>%
+  rename(q1_restore_to_previous_state=q8_1,
+         q2_no_interference=q8_2,
+         q3_transform=q8_3)
+rest <- dplyr::select(managing, response_id, q8_4, q8_5) %>%
+  rename(q4_scale_up_current=q8_4, q5_new=q8_5)
+risk <- dplyr::select(managing, response_id, q8_6, q8_7, q8_8) %>%
+  rename(q6_prioritize_low_risk=q8_6, q7_high_risk_large_benefit=q8_7, q8_learn_more=q8_8)
 ```
 
-Same person working across multiple counties:
-```{r warning=FALSE}
+**Response Rates** by question group:
 
-tmpA <- matrix(data=0, nrow=length(unique(primary.county.net$county))-1, ncol=length(unique(primary.county.net$county))-1)
-row.names(tmpA) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
-colnames(tmpA) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
+(1) human intervention in kelp forests
+```{r message=FALSE}
+n_tot <- length(unique(managing$response_id))
+## response rate for this question?
+act %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
+  mutate(response_cat=ifelse( likert != "Don't know" & !is.na(likert), "answered",likert)) %>%
+  group_by(question8, response_cat) %>% summarise(n=length(unique(response_id))) %>% mutate(response_rate=n/n_tot) %>%
+  dplyr::select(-n) %>% pivot_wider(names_from=question8, values_from=response_rate)
+```
 
-A <- fill_adjacency_matrix(network_data=dplyr::select(primary.county.net, response_id, county) %>% rename(id=response_id, v=county), empty_A=tmpA, self=FALSE)
+(2) what restoration techniques should be focused on
+```{r message=FALSE}
+rest %>% pivot_longer(2:3, names_to='question8', values_to='likert') %>%
+  mutate(response_cat=ifelse( likert != "Don't know" & !is.na(likert), "answered",likert)) %>%
+  group_by(question8, response_cat) %>% summarise(n=length(unique(response_id))) %>% mutate(response_rate=n/n_tot) %>%
+  dplyr::select(-n) %>% pivot_wider(names_from=question8, values_from=response_rate)
+```
 
-g <- graph_from_adjacency_matrix(A, mode="undirected")
-plot(g, layout=layout_with_fr)
+(3) risk
+```{r message=FALSE}
+risk %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
+  mutate(response_cat=ifelse( likert != "Don't know" & !is.na(likert), "answered",likert)) %>%
+  group_by(question8, response_cat) %>% summarise(n=length(unique(response_id))) %>% mutate(response_rate=n/n_tot) %>%
+  dplyr::select(-n) %>% pivot_wider(names_from=question8, values_from=response_rate)
+```
 
-A
+Distribution of responses:
+```{r}
+lk_order <- c("Strongly disagree","Somewhat disagree", "Neither agree nor disagree","Somewhat agree","Strongly agree","Don't know")
+risk %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
+  bind_rows( rest %>% pivot_longer(2:3, names_to='question8', values_to='likert') ) %>%
+  bind_rows( act %>% pivot_longer(2:4, names_to='question8', values_to='likert') ) %>%
+  mutate(likert=ifelse(likert=='Somewhat disgree', 'Somewhat disagree', likert)) %>%
+  filter(!is.na(likert)) %>%
+    group_by(question8, likert) %>% summarise(n=length(unique(response_id))) %>%
+  ggplot(aes(x=question8, y=n, fill=fct_relevel(likert, lk_order))) + 
+  geom_col() +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw() + theme(axis.text.x=element_text(angle=45,hjust=1))
 ```
 
 
-Same org working across multiple counties:
-```{r warning=FALSE}
-A <- matrix(data=0, nrow=length(unique(primary.county.net$county))-1, ncol=length(unique(primary.county.net$county))-1)
-row.names(A) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
-colnames(A) <- unique(primary.county.net$county)[which(unique(primary.county.net$county) != '(all counties)')]
+Variation in response within organizations?
 
-for(i in 1:dim(A)[1]){
-  idat <- primary.county.net %>% filter(county==row.names(A)[i])
-  for(j in 1:dim(A)[2]){
-    if(i!=j){
-      n <- length(unique(primary.county.net %>% 
-                           filter(org_name %in% idat$org_name) %>%
-                           filter(county==colnames(A)[j]) %>%
-                           pull(org_name)) )
-      A[i,j] <- n
-      
-        
-    }
-  }
-}
-g <- graph_from_adjacency_matrix(A, mode="undirected")
-plot(g, layout=layout_with_fr)
+```{r}
+kelp.orgs <- dplyr::select(kelp.edge, response_id, org_name) %>% distinct() %>%
+  mutate(org_name=ifelse(is.na(org_name), 'Individual',org_name))
 
-A
+act %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
+  left_join(kelp.orgs, by='response_id') %>%
+  mutate(likert=ifelse(likert=='Somewhat disgree', 'Somewhat disagree', likert)) %>%
+  filter(!is.na(likert)) %>%
+  group_by(org_name) %>% mutate(org_n=length(unique(response_id))) %>%
+  ungroup() %>% filter(org_n > 1) %>%
+    group_by(org_name, org_n, question8, likert) %>% summarise(n=length(unique(response_id))) %>%
+  mutate(p=n/org_n) %>%
+  ggplot(aes(x=org_name, y=p, fill=fct_relevel(likert, lk_order))) + 
+  geom_col() +
+    facet_wrap(~question8) +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw() + theme(axis.text.x=element_blank())
 ```
 
 
-Whew highly connected network... the only counties without the same people / orgs working between them involve Ventura, San Mateo, and San Luis Obispo. 
-the social network density between biologically connected counties will be 1. Will probably want to be able to look at strength of ties, not just presence / absence, or break down the actor types. 
 
+```{r}
+ rest %>% pivot_longer(2:3, names_to='question8', values_to='likert') %>%
+  left_join(kelp.orgs, by='response_id') %>%
+  mutate(likert=ifelse(likert=='Somewhat disgree', 'Somewhat disagree', likert)) %>%
+  filter(!is.na(likert)) %>%
+  group_by(org_name) %>% mutate(org_n=length(unique(response_id))) %>%
+  ungroup() %>% filter(org_n > 1) %>%
+    group_by(org_name, org_n, question8, likert) %>% summarise(n=length(unique(response_id))) %>%
+  mutate(p=n/org_n) %>%
+  ggplot(aes(x=org_name, y=p, fill=fct_relevel(likert, lk_order))) + 
+  geom_col() +
+    facet_wrap(~question8) +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw() + theme(axis.text.x=element_blank())
+```
+
+
+```{r}
+risk %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
+  left_join(kelp.orgs, by='response_id') %>%
+  mutate(likert=ifelse(likert=='Somewhat disgree', 'Somewhat disagree', likert)) %>%
+  filter(!is.na(likert)) %>%
+  group_by(org_name) %>% mutate(org_n=length(unique(response_id))) %>%
+  ungroup() %>% filter(org_n > 1) %>%
+    group_by(org_name, org_n, question8, likert) %>% summarise(n=length(unique(response_id))) %>%
+  mutate(p=n/org_n) %>%
+  ggplot(aes(x=org_name, y=p, fill=fct_relevel(likert, lk_order))) + 
+  geom_col() +
+    facet_wrap(~question8) +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw() + theme(axis.text.x=element_blank())
+```
 
 
 

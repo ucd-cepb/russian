@@ -9,7 +9,7 @@
 #' @examples
 #' 
 #' @export
-fill_adjacency_matrix <- function(network_data, empty_A = NULL, self=TRUE){
+fill_adjacency_matrix <- function(network_data, empty_A = NULL, self=TRUE, weight=TRUE){
   
   # create an empty matrix if needed #
   if(is.null(empty_A)){
@@ -27,6 +27,7 @@ fill_adjacency_matrix <- function(network_data, empty_A = NULL, self=TRUE){
           n <- length(unique(network_data %>% 
                                filter(id %in% idat$id) %>%
                                pull(id)) )
+          if(weight==FALSE){if(n > 0){n <- 1}}
           A[i,j] <- n
         }
       }
@@ -35,6 +36,7 @@ fill_adjacency_matrix <- function(network_data, empty_A = NULL, self=TRUE){
                              filter(id %in% idat$id) %>%
                              filter(v==colnames(A)[j]) %>%
                              pull(id)) )
+        if(weight==FALSE){if(n > 0){n <- 1}}
         A[i,j] <- n
         
         
