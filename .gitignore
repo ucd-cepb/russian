@@ -51,3 +51,4 @@ rsconnect/
 # Confidential files
 confidential_data/
 R/data_processing/
+R/explore_survey_dat_q.html
