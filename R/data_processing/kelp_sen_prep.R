@@ -1,7 +1,7 @@
 ############### Raw survey data to SEN Prep ############### 
 #
-# Add counties to social network
-# Create levels in social network
+# Add counties to social network - QUESTION 5
+# Create levels in social network -- QUESTIONS 4 & 9 
 # Identify orgs to look for site-level data
 #
 # 2025-02-04  Mary Fisher
