@@ -51,6 +51,7 @@ rsconnect/
 # Confidential files
 confidential_data/
 R/data_processing/kelp_network_v2.R
+R/data_processing/whatisgoingon_social_network.R
 R/explore_survey_dat_q.html
 
 # hello world
