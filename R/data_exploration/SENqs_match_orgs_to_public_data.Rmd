@@ -1,8 +1,15 @@
 ---
-title: "Untitled"
-output: html_document
-date: "2025-03-04"
+title: "Identify sub-county locales for direct observers"
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
 ---
+
+**author: Mary Fisher**
+
+**date written: 2025-03-04**
+
 
 
 ## Description
@@ -68,7 +75,7 @@ dises_partner <- c('California Department of Fish and Wildlife', 'Reef Check','G
 ```
 
 
-*are all response IDs / orgs in the social network in the info data frame, and vice versa?* Not sure why so many are missing from the social network data frame. work with only the info data frame in this script. 
+*are all response IDs / orgs in the social network in the info data frame, and vice versa?* There are many missing from the social network data frame because only those who answered question 11 (which organizations and individual operators have you worked directly with? ...) are in the social network. numbers in this script are based on the number of responses in the info data frame, and org names from a combo of the social network data frame and the survey data. 
 ```{r}
 missing_from_sn <- info$response_id[which(!(info$response_id %in% sn$response_id))]
 length(missing_from_sn)
@@ -90,8 +97,8 @@ do1 <- info %>%
   summarise(all_info=paste(info_type,collapse=",")) %>%
   filter(grepl('I directly observe conditions', all_info) & grepl('I collect or analyze data', all_info)) %>%
   dplyr::select(response_id) %>%
-  # left_join(sn, by='response_id') %>%
-  left_join(dplyr::select(dat_survey, response_id, recipient_first_name, recipient_last_name) %>% distinct())
+  left_join(sn, by='response_id') %>%
+  left_join(dplyr::select(dat_survey, response_id, recipient_first_name, recipient_last_name, q2) %>% distinct())
 
 
 do2 <- info %>%
@@ -99,8 +106,8 @@ do2 <- info %>%
   summarise(all_info=paste(info_type,collapse=",")) %>%
   filter(grepl('I directly observe conditions', all_info) & !(grepl('I collect or analyze data', all_info))) %>%
   dplyr::select(response_id) %>%
-  # left_join(sn, by='response_id') %>%
-  left_join(dplyr::select(dat_survey, response_id, recipient_first_name, recipient_last_name) %>% distinct())
+  left_join(sn, by='response_id') %>%
+  left_join(dplyr::select(dat_survey, response_id, recipient_first_name, recipient_last_name, q2) %>% distinct())
 
 
 any(do1$response_id %in% do2$response_id)
@@ -164,6 +171,8 @@ do1_summary %>%
 
 Save to a spreadsheet. 
 ```{r}
+write_csv(do1_summary %>% filter(is.na(avail)), here(sn.dir, 'processed','direct_observers_data_collection_MISSING_2025-03-05.csv'))
+write_csv(do1_summary %>% filter(!is.na(avail)), here(sn.dir,'processed','direct_observers_data_collection_2025-03-05.csv'))
 ```
 
 
@@ -226,6 +235,11 @@ do2_summary %>%
   unite(col='recipient_name', recipient_first_name, recipient_last_name, sep=" ")
 ```
 
+Save to a spreadsheet. 
+```{r}
+write_csv(do2_summary %>% filter(is.na(avail)), here(sn.dir, 'processed','direct_observers_MISSING_2025-03-05.csv'))
+write_csv(do2_summary %>% filter(!is.na(avail)), here(sn.dir,'processed','direct_observers_2025-03-05.csv'))
+```
 
 
 
@@ -255,6 +269,22 @@ unique(ndo$org_name)
 Do these people represent new organizations, or the same organizations as the direct observers?
 ```{r}
 unique(ndo$org_name[which(!(ndo$org_name %in% c(do1$org_name, do2$org_name)))])
+```
+
+
+
+## Interactive: extra survey data
+
+for individuals missing org names in the processed data
+```{r}
+View(filter(dat_survey, response_id=='R_20uTnIwAQ3UxMrw') %>% 
+       dplyr::select(response_id,finished,recipient_last_name, recipient_first_name,q1, q2, starts_with('q3'), starts_with('q5'),starts_with('q11'), q18,email))
+```
+
+
+update sn
+```{r}
+sn %>% filter(response_id=='R_1ulIyefXrmNqx1f')
 ```
 
 

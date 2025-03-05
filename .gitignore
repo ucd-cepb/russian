@@ -53,5 +53,4 @@ confidential_data/
 R/data_processing/kelp_network_v2.R
 R/data_processing/whatisgoingon_social_network.R
 R/data_processing/whatisgoingon_summary.R
-R/explore_survey_dat_q.html
 R/data_processing/kelp_network_alters_counties.R
