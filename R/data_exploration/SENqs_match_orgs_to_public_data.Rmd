@@ -20,7 +20,7 @@ This script takes a look at which individuals and organizations are represented 
 
 Key sources of information:
 
-[Sanctuary Integrated Monitoring Network Map](https://csumb.maps.arcgis.com/apps/webappviewer/index.html?id=f555c42a349444f2942900139f88fe34)
+[Sanctuary Integrated Monitoring Network Map](https://csumb.maps.arcgis.com/apps/webappviewer/index.html?id=f555c42a349444f2942900139f88fe34) from [SIMON](https://sanctuarysimon.org/tools/interactive-maps/)
 
 [Kelp Forest Challenge](https://kelpforestalliance.com/kelp-forest-challenge)
 
@@ -59,15 +59,24 @@ this is the cleaned up data set on the answer to the question: What are the main
 info <- read_csv(here(sn.dir, 'processed','cleaned_responseID_by_info_source_q9.csv'))
 ```
 
+this is the cleaned up data set on the answer to the question: How are you involved in kelp forest-related issues?
+```{r}
+act <- read_csv(here(sn.dir, 'processed','kelp_by_org_by_interact_2025-02-05.csv'))
+```
+
+
 these are the organizations represented in the online map data or by DISES members / partners:
 ```{r}
 kms_map <- c('Channel Islands National Marine Sanctuary', 
              'Humboldt State University','Reef Check', 
              'Vantuna Research Group', 'Occidental College - Vantuna Research Group', 
+             'California State Polytechnic University Pomona',  ## one individual who is associated with Vantuna Research Group
              'University of California Santa Barbara', 'University of California Santa Barbara - Marine Science Institute',
              'PISCO','Partnership for Interdisciplinary Studies of Coastal Oceans')
 
 kfp_map <- c('The Nature Conservancy','Get Inspired', 'The Bay Foundation')
+
+othr <- c('Elkhorn Slough National Estuarine Research Reserve')   # one response from Otter Research Program (sites in online report)
 
 dises <- c('University of California Davis','University of California Santa Cruz','California State Polytechnic University Humboldt')
 
@@ -86,6 +95,69 @@ length(missing_from_info)
 
 # View(dat_survey %>% filter(response_id %in% missing_from_sn))
 ```
+
+## Add in orgs
+
+Some people who are not in the social network (i.e., didn't provide any alters) didn't get their organization information cleaned up. Do that now. 
+
+Filter for people without an organization name who said they were involved on behalf of an organization.
+```{r}
+need_new_orgs <- do1 %>% filter(is.na(org_name) | org_name=='') %>% filter(q2=='Yes, I am involved on behalf of one organization or group' | q2=='Yes, I am involved on behalf of several organizations or groups') %>%
+  dplyr::select(response_id, recipient_first_name, recipient_last_name) %>% distinct() %>%
+  left_join(dplyr::select(dat_survey, response_id, starts_with('q3')) %>% distinct()) %>% distinct()
+```
+
+clean up the individual columns into a single column
+```{r}
+new_orgs <- need_new_orgs %>%
+  filter(!is.na(q3_individual_1)) %>%
+  mutate(org_name=q3_individual_1) %>% dplyr::select(response_id, recipient_first_name, recipient_last_name, org_name) %>%
+  bind_rows(
+    need_new_orgs %>% filter(is.na(q3_individual_1)) %>%
+      pivot_longer(cols=starts_with('q3_several'), names_to='tmp', values_to='orgs') %>%
+      filter(!is.na(orgs)) %>%
+      group_by(response_id, recipient_first_name, recipient_last_name) %>%
+      summarise(org_name=paste0(orgs,collapse='/'))
+  )
+```
+
+clean up the specific answers
+```{r}
+new_orgs %<>% mutate(org_name=case_when(
+  org_name=="CDFW" ~ "California Department of Fish and Wildlife",
+  org_name=="Cal Poly Humboldt" ~ "California State Polytechnic Institute",
+  org_name=="UC Santa Barbara" ~ "University of California Santa Barbara",
+  org_name=="UCSC" ~ "University of California Santa Cruz",
+  org_name=="Reef check" ~ "Reef Check",
+  org_name=="SBC LTER" ~ "University of California Santa Barbara - SBC LTER",
+  response_id=="R_50v3Pt1UGJw51HP" ~ "Moss Landing Marine Laboratory - Sunflower Star Lab/The Nature Conservancy/California Sea Grant/Monterey Abalone Company",
+  response_id=="R_7DMyWjdBdNj6bfz" ~
+    "University of California Santa Barbara - SCB LTER & Seaweed CDR Project",
+ response_id=="R_5dGJi242F31TvPK" ~ "University of California San Diego - Scripps Institution of Oceanography/Birch Aquarium/California Sea Grant/Seatrees",
+  .default=org_name
+))
+```
+
+add back in one person who didn't put their affiliation
+```{r}
+new_orgs %<>% filter(response_id!='R_1ulIyefXrmNqx1f') %>%
+  bind_rows(
+  filter(need_new_orgs, response_id=='R_1ulIyefXrmNqx1f') %>% 
+                          dplyr::select(response_id, recipient_first_name, recipient_last_name) %>%
+    mutate(org_name='University of California San Diego/California Sea Grant'))
+```
+
+```{r}
+do1_tmp <- do1 %>% filter(response_id %in% new_orgs$response_id) %>% 
+  dplyr::select(-org_name) %>%
+  left_join(new_orgs, by=c('response_id','recipient_first_name','recipient_last_name'))
+
+
+do11 <- do1 %>% filter(!(response_id %in% do1_tmp)) %>%
+  bind_rows(do1_tmp)
+```
+
+
 
 
 ## Direct observers
@@ -116,56 +188,47 @@ paste0('Observe and Data: ',length(unique(do1$response_id)))
 paste0('Observe only: ', length(unique(do2$response_id)))
 ```
 
-### Observe & Data
-
-Which organizations are represented by DO1s?
+How many organizations represented?
 ```{r}
-unique(do1$org_name)
+paste0('Observe and Data: ',length(unique(do1 %>% filter(!is.na(org_name) & org_name != "Individual") %>% pull(org_name))))
+paste0('Observe only: ', length(unique(do2 %>% filter(!is.na(org_name) & org_name != "Individual") %>% pull(org_name))))
 ```
 
-What proportion of organizations, respondents are on the kelp monitoring map or in the DISES group?
+
+How many people not working on behalf of organizations?
+```{r}
+paste0('Observe and Data: ',length(unique(do1 %>% filter(is.na(org_name) | org_name == "Individual") %>% pull(response_id))))
+paste0('Observe only: ', length(unique(do2 %>% filter(is.na(org_name) | org_name == "Individual") %>% pull(response_id))))
+```
+
+
+### Observe & Data: all
+
+Include all survey respondants who answered the question on how they get their information, including those who are not in the social network. 
+
+#### on behalf of an org
+
+What proportion of direct observation/data collection survey respondents are on the kelp monitoring map or in the DISES group?
 ```{r echo=FALSE}
 do1_summary <- do1 %>% mutate(avail=ifelse(org_name %in% kms_map, 'KMS Map',
                                            ifelse(org_name %in% kfp_map, 'KelpChallenge Map',
-                                           ifelse(org_name %in% dises, 'DISES',
-                                                  ifelse(org_name %in% dises_partner, 'DISES partner', NA)))))
+                                                  ifelse(org_name %in% othr, 'Other Online',
+                                                         ifelse(org_name %in% dises, 'DISES',
+                                                                ifelse(org_name %in% dises_partner, 'DISES partner', NA))))))
 ```
 ```{r}
-paste0('Individuals: ',
-length(unique(filter(do1_summary, !is.na(avail))$response_id))/length(unique(do1_summary$response_id)))
+paste0('DISES etc. Individuals: ', length(unique(filter(do1_summary, avail %in% c('DISES','DISES partner'))$response_id)), ' (',
+length(unique(filter(do1_summary, avail %in% c('DISES','DISES partner'))$response_id))/length(unique(do1_summary$response_id)),')')
 
-paste0('Organizations: ',
-       round(length(unique(filter(do1_summary, !is.na(avail))$org_name))/length(unique(do1_summary$org_name)), 3))
-```
+paste0('DISES etc. Organizations: ',length(unique(filter(do1_summary, avail %in% c('DISES','DISES partner'))$org_name)),' (',
+       round(length(unique(filter(do1_summary, avail %in% c('DISES','DISES partner'))$org_name))/length(unique(do1_summary$org_name)), 3),')')
 
 
-Which of these organizations are *not* on the kelp monitoring/challenge map or in the DISES group?
-```{r echo=FALSE}
-unique(do1_summary %>% filter(is.na(avail)) %>%
-  pull(org_name))
-```
+paste0('Other covered Individuals: ',length(unique(filter(do1_summary, avail %in% c('KMS Map','KelpChallenge Map','Other Online'))$response_id)), ' (',
+length(unique(filter(do1_summary, avail %in% c('KMS Map','KelpChallenge Map','Other Online'))$response_id))/length(unique(do1_summary$response_id)),')')
 
-Who are the individuals?
-```{r}
-do1_summary %>%
-  filter(is.na(avail)) %>%
-  filter(is.na(org_name) | org_name=="Individual") %>%
-  dplyr::select(response_id, org_name) %>%
-  left_join(dplyr::select(dat_survey, finished, response_id, recipient_first_name, recipient_last_name) %>% distinct()) %>%
-  filter(finished=='True') %>% distinct()
-```
-
-Who do they work with? This won't be an exhaustive list because some are missing from the social network. 
-```{r}
-do1_summary %>%
-  filter(is.na(avail)) %>%
-  filter(is.na(org_name) | org_name=="Individual") %>%
-  dplyr::select(response_id, org_name) %>%
-  left_join(dplyr::select(dat_survey, finished, response_id, recipient_first_name, recipient_last_name) %>% distinct()) %>%
-  filter(finished=='True') %>% distinct() %>%
-  left_join(dplyr::select(sn, response_id, alter), by='response_id') %>%
-  dplyr::select(-finished) %>%
-  unite(col='recipient_name', recipient_first_name, recipient_last_name, sep=" ")
+paste0('Other covered Organizations: ',length(unique(filter(do1_summary, avail %in% c('KMS Map','KelpChallenge Map','Other Online'))$org_name)), ' (',
+       round(length(unique(filter(do1_summary, avail %in% c('KMS Map','KelpChallenge Map','Other Online'))$org_name))/length(unique(do1_summary$org_name)), 3),')')
 ```
 
 
@@ -174,6 +237,149 @@ Save to a spreadsheet.
 write_csv(do1_summary %>% filter(is.na(avail)), here(sn.dir, 'processed','direct_observers_data_collection_MISSING_2025-03-05.csv'))
 write_csv(do1_summary %>% filter(!is.na(avail)), here(sn.dir,'processed','direct_observers_data_collection_2025-03-05.csv'))
 ```
+
+
+--Side Bar: -- Which of these organizations are *not* on the kelp monitoring/challenge map or in the DISES group?
+```{r echo=FALSE}
+unique(do1_summary %>% filter(is.na(avail)) %>%
+  pull(org_name))
+```
+
+
+How many individuals working on behalf of an organization *not covered above* are involved in harvesting or fishing or growing? What proportion is this of individuals in this subset, and among all individuals working on behalf of an organization?
+```{r}
+do1_act <- do1_summary %>% filter(!is.na(org_name) & org_name != "Individual") %>%
+  filter(is.na(avail)) %>%
+  left_join(dplyr::select(act,response_id,interact_type), by='response_id')
+
+do1_harvest <- unique(do1_act %>% filter(interact_type=="Harvesting or fishing or growing") %>% pull(response_id))
+
+length(do1_harvest)
+
+
+length(do1_harvest)/length(unique(do1_act$response_id))
+
+
+
+length(do1_harvest)/ length(unique(do1_summary$response_id))
+```
+
+Any unique organizations being represented by these individuals?
+```{r}
+unique(do1_act %>% filter(response_id %in% do1_harvest) %>% pull(org_name))
+```
+
+
+And that leaves...
+```{r}
+length(unique(do1_act %>% filter(!(response_id %in% do1_harvest)) %>% pull(response_id)))
+
+
+length(unique(do1_act %>% filter(!(response_id %in% do1_harvest)) %>% pull(response_id)))/length(unique(do1_act$response_id))
+
+
+
+length(unique(do1_act %>% filter(!(response_id %in% do1_harvest)) %>% pull(response_id)))/ length(unique(do1_summary$response_id))
+```
+
+What organizations do these individuals work for?
+```{r}
+do1_act %>% filter(!(response_id %in% do1_harvest)) %>% group_by(org_name) %>% summarise(n=length(unique(response_id)))
+```
+
+Are all of these individuals in the social network (i.e., answered question #11?) 
+```{r}
+length(unique(do1_act %>% filter(!(response_id %in% do1_harvest) & response_id %in% sn$response_id) %>% pull(response_id)))
+```
+
+Yes!
+
+
+#### individuals
+
+How many individuals are *not* working on behalf of an organization?
+```{r warning=FALSE}
+do1_individ_act <- do1_summary %>% filter(is.na(org_name) | org_name == "Individual") %>%
+  filter(!(response_id %in% do1_tmp$response_id)) %>%
+  left_join(dplyr::select(act,response_id,interact_type), by='response_id')
+
+length(unique(do1_individ_act$response_id))
+```
+
+How many of these are in the social network? (i.e., filled out alters info)
+```{r}
+length(unique(do1_individ_act %>% filter(response_id %in% sn$response_id) %>% pull(response_id)))
+```
+
+Oh wow, ok. Not many. I'll answer the questions below first for any survey respondents, and then for those included in the social network. 
+
+How many individuals are involved in harvesting or fishing or growing? What proportion is this of all observation/data collection individuals?
+```{r}
+do1_individ_harvest <- unique(do1_individ_act %>% filter(interact_type=="Harvesting or fishing or growing") %>% pull(response_id))
+
+length(do1_individ_harvest)
+
+length(do1_individ_harvest)/ length(unique(do1_summary$response_id))
+```
+
+Who do they work with? Some may not have provided alters.
+```{r}
+do1_summary %>%
+  filter(response_id %in% do1_individ_harvest) %>%
+  dplyr::select(response_id, org_name) %>%
+  left_join(dplyr::select(dat_survey, finished, response_id, recipient_first_name, recipient_last_name) %>% distinct()) %>%
+  distinct() %>%
+  left_join(dplyr::select(sn, response_id, alter), by='response_id') %>%
+  unite(col='recipient_name', recipient_first_name, recipient_last_name, sep=" ") %>%
+  group_by(response_id, recipient_name) %>% summarise(alters=paste0(alter,collapse=', '))
+```
+
+Ok so none of them provided alters... Does that mean that 0 individuals *in the social network* are involved in harvesting or fishing or growing? 
+```{r}
+length(unique(do1_individ_act %>% filter(interact_type=="Harvesting or fishing or growing") %>% filter(response_id %in% sn$response_id) %>% pull(response_id)))
+```
+
+
+How many individuals are involved in research, or a student? What proportion is this of all observation/data collection individuals?
+```{r}
+do1_individ_othr <- unique(do1_individ_act %>% filter(interact_type=="Research" | interact_type=="Student") %>% pull(response_id))
+
+length(do1_individ_othr)
+
+length(do1_individ_othr)/ length(unique(do1_summary$response_id))
+```
+
+Who do they work with? Some may not have provided alters.
+```{r}
+do1_summary %>%
+  filter(response_id %in% do1_individ_othr) %>%
+  dplyr::select(response_id, org_name) %>%
+  left_join(dplyr::select(dat_survey, finished, response_id, recipient_first_name, recipient_last_name) %>% distinct()) %>%
+  filter(finished=='True') %>% distinct() %>%
+  left_join(dplyr::select(sn, response_id, alter), by='response_id') %>%
+  unite(col='recipient_name', recipient_first_name, recipient_last_name, sep=" ") %>%
+  group_by(response_id, recipient_name) %>% summarise(alters=paste0(alter,collapse=', '))
+```
+
+What do the 5 individuals in the social network do, and who do they work with?
+```{r}
+do1_individ_act %>% filter(response_id %in% sn$response_id) %>% dplyr::select(response_id,interact_type) %>% distinct() %>%
+  group_by(response_id) %>% summarise(interact_type=paste0(interact_type, collapse=', '))
+```
+
+```{r}
+do1_individ_act %>% filter(response_id %in% sn$response_id) %>%
+  filter(edge_type=='collaboration') %>%
+  dplyr::select(response_id,alter) %>% distinct() %>%
+  group_by(response_id) %>% summarise(alters=paste0(alter, collapse=', '))
+```
+
+Mostly Reef Check
+
+
+### Observe & Data: social network
+
+Exclude individuals who did not reply to any of the collaborate / communicate / coordinate questions.
 
 
 
@@ -243,6 +449,69 @@ write_csv(do2_summary %>% filter(!is.na(avail)), here(sn.dir,'processed','direct
 
 
 
+#### harvesting or fishing or growing
+
+How many individuals working on behalf of an organization are involved in harvesting or fishing or growing? What proportion is this of individuals in this subset, and among all individuals working on behalf of an organization?
+```{r}
+do2_act <- do2_summary %>% filter(!is.na(org_name) & org_name != "Individual") %>%
+  left_join(dplyr::select(act,response_id,interact_type), by='response_id')
+
+do2_harvest <- unique(do2_act %>% filter(interact_type=="Harvesting or fishing or growing") %>% pull(response_id))
+
+length(do2_harvest)
+
+length(do2_harvest)/length(unique(do2_act$response_id))
+
+length(do2_harvest)/ length(unique(do2_summary$response_id))
+```
+Which organizations are they working for?
+```{r}
+do2_summary %>% filter(response_id %in% do2_harvest) %>% dplyr::select(org_name) %>% distinct()
+```
+
+How many individuals *not* working on behalf of an organization are involved in harvesting or fishing or growing? 
+```{r}
+do2_act_individ <- do2_summary %>% filter(is.na(org_name) | org_name == "Individual") %>%
+  left_join(dplyr::select(act,response_id,interact_type), by='response_id')
+
+do2_harvest_individ <- unique(do2_act_individ %>% filter(interact_type=="Harvesting or fishing or growing") %>% pull(response_id))
+
+length(do2_harvest_individ)
+```
+
+
+Combined with above, what proportion is this of "direct observer" individuals?
+```{r}
+sum(length(do2_harvest),length(do2_harvest_individ))/length(unique(do2_summary$response_id))
+
+length(do2_harvest)/ length(unique(do2_summary$response_id))
+```
+
+#### not harvesting or fishing or growing
+
+How many individuals working on behalf of an organization are *not* involved in harvesting or fishing or growing? 
+```{r}
+do2_noharvest <- unique(do2_act %>% filter(!(response_id %in% do2_harvest)) %>% pull(response_id))
+
+length(do2_noharvest)
+```
+Which organizations are they working for?
+```{r}
+do2_summary %>% filter(response_id %in% do2_noharvest) %>% dplyr::select(org_name) %>% distinct()
+```
+
+
+How many individuals *not* working on behalf of an organization are *not* involved in harvesting or fishing or growing? 
+```{r}
+do2_noharvest_individ <- unique(do2_act_individ %>% filter(!(response_id %in% do2_harvest_individ)) %>% pull(response_id))
+
+length(do2_noharvest_individ)
+```
+
+
+
+
+
 
 
 
@@ -258,6 +527,7 @@ ndo <- info %>%
   # left_join(sn, by='response_id') %>%
   left_join(dplyr::select(dat_survey, response_id, recipient_first_name, recipient_last_name) %>% distinct())
 
+length(unique(ndo$response_id)) 
 length(unique(ndo$response_id)) / length(unique(info$response_id))
 ```
 
@@ -270,6 +540,12 @@ Do these people represent new organizations, or the same organizations as the di
 ```{r}
 unique(ndo$org_name[which(!(ndo$org_name %in% c(do1$org_name, do2$org_name)))])
 ```
+
+
+
+
+
+
 
 
 
