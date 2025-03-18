@@ -43,6 +43,8 @@ sn.dir <- here('confidential_data')
 
 ## Data
 
+### survey 
+
 this is the raw survey data
 ```{r}
 dat_survey <- read_csv(here(sn.dir, "raw", "kelp_jan.9.25_copy.csv"))[-c(1,2),]
@@ -63,7 +65,12 @@ this is the cleaned up data set on the answer to the question: How are you invol
 ```{r}
 act <- read_csv(here(sn.dir, 'processed','kelp_by_org_by_interact_2025-02-05.csv'))
 ```
+this is the cleaned up data set for survey respondents who work for multiple organizations
+```{r}
+morg <- read_csv(here(sn.dir,'processed','cleaned_multiple_orgs_2025-03-17.csv'))
+```
 
+### site data sets
 
 these are the organizations represented in the online map data or by DISES members / partners:
 ```{r}
@@ -96,70 +103,6 @@ length(missing_from_info)
 # View(dat_survey %>% filter(response_id %in% missing_from_sn))
 ```
 
-## Add in orgs
-
-Some people who are not in the social network (i.e., didn't provide any alters) didn't get their organization information cleaned up. Do that now. 
-
-Filter for people without an organization name who said they were involved on behalf of an organization.
-```{r}
-need_new_orgs <- do1 %>% filter(is.na(org_name) | org_name=='') %>% filter(q2=='Yes, I am involved on behalf of one organization or group' | q2=='Yes, I am involved on behalf of several organizations or groups') %>%
-  dplyr::select(response_id, recipient_first_name, recipient_last_name) %>% distinct() %>%
-  left_join(dplyr::select(dat_survey, response_id, starts_with('q3')) %>% distinct()) %>% distinct()
-```
-
-clean up the individual columns into a single column
-```{r}
-new_orgs <- need_new_orgs %>%
-  filter(!is.na(q3_individual_1)) %>%
-  mutate(org_name=q3_individual_1) %>% dplyr::select(response_id, recipient_first_name, recipient_last_name, org_name) %>%
-  bind_rows(
-    need_new_orgs %>% filter(is.na(q3_individual_1)) %>%
-      pivot_longer(cols=starts_with('q3_several'), names_to='tmp', values_to='orgs') %>%
-      filter(!is.na(orgs)) %>%
-      group_by(response_id, recipient_first_name, recipient_last_name) %>%
-      summarise(org_name=paste0(orgs,collapse='/'))
-  )
-```
-
-clean up the specific answers
-```{r}
-new_orgs %<>% mutate(org_name=case_when(
-  org_name=="CDFW" ~ "California Department of Fish and Wildlife",
-  org_name=="Cal Poly Humboldt" ~ "California State Polytechnic Institute",
-  org_name=="UC Santa Barbara" ~ "University of California Santa Barbara",
-  org_name=="UCSC" ~ "University of California Santa Cruz",
-  org_name=="Reef check" ~ "Reef Check",
-  org_name=="SBC LTER" ~ "University of California Santa Barbara - SBC LTER",
-  response_id=="R_50v3Pt1UGJw51HP" ~ "Moss Landing Marine Laboratory - Sunflower Star Lab/The Nature Conservancy/California Sea Grant/Monterey Abalone Company",
-  response_id=="R_7DMyWjdBdNj6bfz" ~
-    "University of California Santa Barbara - SCB LTER & Seaweed CDR Project",
- response_id=="R_5dGJi242F31TvPK" ~ "University of California San Diego - Scripps Institution of Oceanography/Birch Aquarium/California Sea Grant/Seatrees",
-  .default=org_name
-))
-```
-
-add back in one person who didn't put their affiliation
-```{r}
-new_orgs %<>% filter(response_id!='R_1ulIyefXrmNqx1f') %>%
-  bind_rows(
-  filter(need_new_orgs, response_id=='R_1ulIyefXrmNqx1f') %>% 
-                          dplyr::select(response_id, recipient_first_name, recipient_last_name) %>%
-    mutate(org_name='University of California San Diego/California Sea Grant'))
-```
-
-```{r}
-do1_tmp <- do1 %>% filter(response_id %in% new_orgs$response_id) %>% 
-  dplyr::select(-org_name) %>%
-  left_join(new_orgs, by=c('response_id','recipient_first_name','recipient_last_name'))
-
-
-do11 <- do1 %>% filter(!(response_id %in% do1_tmp)) %>%
-  bind_rows(do1_tmp)
-```
-
-
-
-
 ## Direct observers
 
 Get a list of those who (a) directly observe and collect data, or (b) just directly observe kelp forests. These should be mutually exclusive lists.
@@ -187,6 +130,22 @@ any(do1$response_id %in% do2$response_id)
 paste0('Observe and Data: ',length(unique(do1$response_id)))
 paste0('Observe only: ', length(unique(do2$response_id)))
 ```
+
+```{r echo=FALSE}
+# ---sidebar---
+do1 %<>% left_join(morg,by='response_id')
+to_correct <- filter(do1, is.na(org_name) & !is.na(multi_org))
+do1 %<>%
+  filter(response_id != to_correct$response_id) %>%
+  bind_rows(
+    to_correct %>% mutate(org_name=multi_org)
+  )
+
+
+do2 %<>% left_join(morg,by='response_id')
+to_correct <- filter(do2, is.na(org_name) & !is.na(multi_org))
+```
+
 
 How many organizations represented?
 ```{r}
@@ -239,17 +198,21 @@ write_csv(do1_summary %>% filter(!is.na(avail)), here(sn.dir,'processed','direct
 ```
 
 
+
+Time to work on the groups I don't have good data for.
+```{r}
+do1_missing <- do1_summary %>% filter(is.na(avail))
+```
+
 --Side Bar: -- Which of these organizations are *not* on the kelp monitoring/challenge map or in the DISES group?
 ```{r echo=FALSE}
-unique(do1_summary %>% filter(is.na(avail)) %>%
-  pull(org_name))
+unique(do1_missing$org_name)
 ```
 
 
 How many individuals working on behalf of an organization *not covered above* are involved in harvesting or fishing or growing? What proportion is this of individuals in this subset, and among all individuals working on behalf of an organization?
 ```{r}
-do1_act <- do1_summary %>% filter(!is.na(org_name) & org_name != "Individual") %>%
-  filter(is.na(avail)) %>%
+do1_act <- do1_missing %>% filter(!is.na(org_name) & org_name != "Individual") %>%
   left_join(dplyr::select(act,response_id,interact_type), by='response_id')
 
 do1_harvest <- unique(do1_act %>% filter(interact_type=="Harvesting or fishing or growing") %>% pull(response_id))
@@ -264,9 +227,15 @@ length(do1_harvest)/length(unique(do1_act$response_id))
 length(do1_harvest)/ length(unique(do1_summary$response_id))
 ```
 
-Any unique organizations being represented by these individuals?
+Which organizations are represented by these individuals?
 ```{r}
 unique(do1_act %>% filter(response_id %in% do1_harvest) %>% pull(org_name))
+```
+
+**Mark these individuals as 'all non-protected waters'**
+```{r}
+do1_missing_out <- data.frame(response_id=do1_harvest) %>%
+  mutate(assign='all non-protected waters')
 ```
 
 
@@ -524,7 +493,7 @@ ndo <- info %>%
   summarise(all_info=paste(info_type,collapse=",")) %>%
   filter(!(grepl('I directly observe conditions', all_info))) %>%
   dplyr::select(response_id) %>%
-  # left_join(sn, by='response_id') %>%
+  left_join(sn, by='response_id') %>%
   left_join(dplyr::select(dat_survey, response_id, recipient_first_name, recipient_last_name) %>% distinct())
 
 length(unique(ndo$response_id)) 
