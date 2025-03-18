@@ -68,12 +68,13 @@ library(janitor)
 #
 library(igraph)
 library(bipartite)
+library(ggalluvial)
 #
 source(here('R','subfxn','fill_adjacency_matrix.R'))
 source(here('R','subfxn','fill_bipartite_adjacency_matrix.R'))
 # Data --------------------------------------------------------------------
 ## social network (processed)
-kelp.edge <- read_csv(here('confidential_data','processed','kelp_social_by_org_2025-02-04.csv'))
+kelp.edge <- read_csv(here('confidential_data','processed','cleaned_social_network_with_org_2025-03-14.csv'))
 
 kelp.orgs <- dplyr::select(kelp.edge, response_id, org_name) %>% distinct() %>%
   mutate(org_name=ifelse(is.na(org_name), 'Individual',org_name))
@@ -88,10 +89,10 @@ survey_dat %<>% filter(!(q5_17_text %in% c("Baja California","Ensenada, Mexico")
 survey_dat %<>% filter(q1 != 'I have no involvement in kelp forest-related issues')
 
 ## social - county network
-county.net <- read_csv(here('confidential_data','processed','kelp_by_org_by_CAcounty_2025-02-04.csv'))
+county.net <- read_csv(here('confidential_data','processed','cleaned_responseID_by_county.csv'))
 
 ## social - interaction / involvement type
-interact.net <- read_csv(here('confidential_data','processed','kelp_by_org_by_interact_2025-02-05.csv')) 
+interact.net <- read_csv(here('confidential_data','processed','cleaned_responseID_by_info_source_q9.csv')) 
 
 ```
 
@@ -716,6 +717,26 @@ risk %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
   scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
   theme_bw() + theme(axis.text.x=element_blank())
 ```
+
+
+
+Did people respond to these as though they were mutually exclusive? Not really. A lot of "strongly agree" for Q1 were also "Strongly agree" for Q2
+```{r fig.width=10}
+myA <- act %>% dplyr::select(q1_restore_to_previous_state,q3_transform) %>%
+  rename(v1=q1_restore_to_previous_state, v2=q3_transform) %>%
+fill_bipartite_adjacency_matrix(empty_A = NULL, weights=TRUE)
+
+rownames(myA)[dim(myA)[1]] <- "No Answer"; colnames(myA)[dim(myA)[2]] <- "No Answer"
+lscale <- c("Strongly disagree", "Somewhat disgree", "Neither agree nor disagree", "Somewhat agree","Strongly agree","Don't know")
+as.data.frame(myA) %>% rownames_to_column(var='q1_restore_to_previous_state') %>%
+  pivot_longer(!starts_with('q1'), names_to='q3_transform', values_to='count') %>%
+  ggplot(aes(axis1=fct_relevel(q1_restore_to_previous_state, lscale), axis2=fct_relevel(q3_transform,lscale), y=count)) +
+    geom_alluvium(aes(fill=q1_restore_to_previous_state)) +
+     geom_stratum(width = 1/12, fill = "gray", color = "black") +
+     geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+    theme_bw() + theme(legend.position='none')
+```
+
 
 
 

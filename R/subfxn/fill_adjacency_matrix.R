@@ -3,7 +3,7 @@
 #' Fill an 'i' by 'j' adjacency matrix, the 
 #' foundation of network graphs. 
 #'
-#' @param network_data a data frame with the columns: id, v.  First columns should contain 
+#' @param network_data a data frame with the columns: id, v.  First columns should contain individual identifier (ego), second column should contain the alter
 #' @param empty_A an empty matrix to fill from the network_data data frame. default is NULL, the function builds the empty matrix for you
 #' @return a adjacency matrix
 #' @examples
