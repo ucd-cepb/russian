@@ -731,10 +731,11 @@ lscale <- c("Strongly disagree", "Somewhat disgree", "Neither agree nor disagree
 as.data.frame(myA) %>% rownames_to_column(var='q1_restore_to_previous_state') %>%
   pivot_longer(!starts_with('q1'), names_to='q3_transform', values_to='count') %>%
   ggplot(aes(axis1=fct_relevel(q1_restore_to_previous_state, lscale), axis2=fct_relevel(q3_transform,lscale), y=count)) +
-    geom_alluvium(aes(fill=q1_restore_to_previous_state)) +
-     geom_stratum(width = 1/12, fill = "gray", color = "black") +
-     geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
-    theme_bw() + theme(legend.position='none')
+  geom_alluvium(aes(fill=q1_restore_to_previous_state)) +
+  geom_stratum(width = 1/12, aes(fill=q1_restore_to_previous_state), color = "black") +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw() + theme(legend.position='none')
 ```
 
 
