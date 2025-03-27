@@ -133,16 +133,16 @@ paste0('Observe only: ', length(unique(do2$response_id)))
 
 ```{r echo=FALSE}
 # ---sidebar---
-do1 %<>% left_join(morg,by='response_id')
+do1 %<>% dplyr::select(-org_name) %>% left_join(morg,by='response_id')
 to_correct <- filter(do1, is.na(org_name) & !is.na(multi_org))
-do1 %<>%
-  filter(response_id != to_correct$response_id) %>%
-  bind_rows(
-    to_correct %>% mutate(org_name=multi_org)
-  )
+# do1 %<>%
+#   filter(response_id != to_correct$response_id) %>%
+#   bind_rows(
+#     to_correct %>% mutate(org_name=multi_org)
+#   )
 
 
-do2 %<>% left_join(morg,by='response_id')
+do2 %<>% dplyr::select(-org_name) %>% left_join(morg,by='response_id')
 to_correct <- filter(do2, is.na(org_name) & !is.na(multi_org))
 ```
 
@@ -192,7 +192,7 @@ paste0('Other covered Organizations: ',length(unique(filter(do1_summary, avail %
 
 
 Save to a spreadsheet. 
-```{r}
+```{r eval=FALSE}
 write_csv(do1_summary %>% filter(is.na(avail)), here(sn.dir, 'processed','direct_observers_data_collection_MISSING_2025-03-05.csv'))
 write_csv(do1_summary %>% filter(!is.na(avail)), here(sn.dir,'processed','direct_observers_data_collection_2025-03-05.csv'))
 ```
@@ -204,7 +204,7 @@ Time to work on the groups I don't have good data for.
 do1_missing <- do1_summary %>% filter(is.na(avail))
 ```
 
---Side Bar: -- Which of these organizations are *not* on the kelp monitoring/challenge map or in the DISES group?
+--Side Bar: -- Which of these organizations are *not* on the kelp monitoring/challenge map or in the DISES group? Are any individuals involved on behalf of multiple orgs?
 ```{r echo=FALSE}
 unique(do1_missing$org_name)
 ```
@@ -262,6 +262,42 @@ length(unique(do1_act %>% filter(!(response_id %in% do1_harvest) & response_id %
 ```
 
 Yes!
+
+
+
+#### on behalf of several orgs
+
+How many individuals are working on behalf of several organizations?
+```{r warning=FALSE}
+do1_multi_act <- do1_summary %>% 
+  filter(!is.na(multi_org)) %>%
+  left_join(dplyr::select(act,response_id,interact_type), by='response_id')
+
+do1_multi_act %<>% separate(multi_org, into=c('org1','org2','org3','org4','org5','org6'), sep=', ', remove=FALSE) %>% dplyr::select(-org1)
+
+
+paste0('Number of survey respondents: ', length(unique(do1_multi_act$response_id)))
+paste0('Number of organizations: ', length(unique(
+  do1_multi_act %>% dplyr::select(starts_with('org')) %>%
+         pivot_longer(cols=all_of(starts_with('org')), names_to='tmp', values_to='orgs') %>%
+    filter(!is.na(orgs) & !(orgs %in% do1_summary$org_name)) %>% pull(orgs))))
+```
+
+The organizations are networks or working groups that are primarily geared toward *management* or an *event* and don't do on-the-ground work separately.
+```{r echo=TRUE}
+mng <- c("California Ocean Protection Council","Kelp Restoration and Management Plan Community Working Group",
+         "Association of Zoos and Aquariums SAFE Sunflower Sea Star","California Marine Sanctuary Foundation",
+         "California Seaweed Festival","Kelp Forest Alliance")
+```
+
+```{r}
+remove_orgs <- function(x, to_rmv=mng){
+  as.character(sapply(x, FUN=function(y){if(y %in% to_rmv){return(NA)} else{return(y)}}))
+}
+
+do1_multi_filter <- do1_multi_act %>% rename(first_org_name=org_name) %>%
+  mutate_at(vars(starts_with('org')), remove_orgs)
+```
 
 
 #### individuals
