@@ -1,0 +1,205 @@
+id,organization,organization_type,organization_label
+1,Above/Below,6,NGO
+2,AltaSeads Conservancy,6,NGO
+3,Amah Mutsun Land Trust,8,Tribal
+4,Anthropocene Institute,9,Consulting
+5,Aquarium of the Pacific,7,Research
+6,Artist 1,5,Individual
+7,Artist 2,5,Individual
+8,Artist 3,5,Individual
+9,Artist 4,5,Individual
+10,Artist 5,5,Individual
+11,Blue Evolution,6,NGO
+12,Blue Harmony,6,NGO
+13,Bureau of Ocean Energy Management,1,Federal
+14,California Academy of Sciences,7,Research
+15,California Coastal Commission,2,State
+16,California Department of Fish and Wildlife,2,State
+17,California Diving News,10,Media
+18,California Fish and Game Commission,2,State 
+19,California Marine Sanctuary Foundation,6,NGO
+20,California Ocean Protection Council,2,State
+21,California Ocean Science Trust,6,NGO
+22,California Sea Grant,0,?
+23,California Sea Urchin Commission,6,NGO
+24,California Seaweed Festival,4,Local
+25,California State Lands Commission,2,State 
+26,California State Parks,2,State
+27,California State Polytechnic University Humboldt,7,Research
+28,California State Polytechnic University Pomona,7,Research
+29,California State University Agricultural Research Institute,7,Research
+30,California State University Chico,7,Research
+31,California State University Long Beach,7,Research
+32,California State University Monterey Bay,7,Research
+33,California State University Northridge,7,Research
+34,Catalina Island Marine Institute,7,Research
+35,CCCoP,0,Other
+36,Channel Islands National Marine Sanctuary,3,Regional
+37,City College of San Francisco,7,Research
+38,City of Fort Bragg,4,Local
+39,City of Long Beach,4,Local
+40,City of San Diego,4,Local
+41,Coastal Conservation Association California,6,NGO
+42,Coastal Environments,9,Consulting
+43,Cordell Bank National Marine Sanctuary,3,Regional
+44,Council of the Haida Nation,8,Tribal
+45,Dandy Fish Company,4,Local
+46,DeeperBlue,4,Local
+47,Defenders of Wildlife,6,NGO
+48,Divers,5,Individual
+49,Earth Equity,6,NGO
+50,Edges of Earth,6,NGO
+51,Elkhorn Slough Ecological Reserve,4,Local
+52,Elkhorn Slough National Estuarine Research Reserve,7,Research
+53,Environment California,6,NGO
+54,Environmental Defense Fund,6,NGO
+55,Fish Reef Project,6,NGO
+56,FISHBIO,9,Consulting
+57,Fisher 10,5,Individual
+58,Fisher 11,5,Individual
+59,Fisher 2,5,Individual
+60,Fisher 3,5,Individual
+61,Fisher 4,5,Individual
+62,Fisher 5,5,Individual
+63,Fisher 6,5,Individual
+64,Fisher 7,5,Individual
+65,Fisher 8,5,Individual
+66,Fisher 9,5,Individual
+67,Fishers,5,Individual
+68,Florida State University,7,Research
+69,Friends of the Dunes,6,NGO
+70,Garden Club of America,6,NGO
+71,Get Inspired,6,NGO
+72,Giant Giant Kelp Restoration Project,6,NGO
+73,Girl Scouts of America,6,NGO
+74,Golden Gate Collaborative,7,Research
+75,Greater Farallones Association,6,NGO
+76,Greater Farallones National Marine Sanctuary,3,Regional
+77,GreenWave,6,NGO
+78,Gwaii Haanas National Park Reserve,3,Regional
+79,Hakai Institute,7,Research
+80,Hog Island Oyster Company,4,Local
+81,Individual 1,5,Individual
+82,Individual 2,5,Individual
+83,Individual 3,5,Individual
+84,Individual 4,5,Individual
+85,InterTribal Sinkyone Wilderness Council,8,Tribal
+86,Joseph M. Long Marine Laboratory,7,Research
+87,Kashia Band of Pomo Indians,8,Tribal
+88,Kelp Farmers,5,Individual
+89,Kelp Forest Alliance,6,NGO
+90,Kelp Restoration and Management Plan Community Working Group,2,State
+91,Kelp Restoration and Management Plan Scientific Advisory Team,2,State
+92,LAWaterkeeper,6,NGO
+93,Marine Conservation Institute,6,NGO
+94,Marine Protected Area Collaborative Network,7,Research
+95,Middlebury Institute of International Studies at Monterey,7,Research
+96,Monterey Abalone Company,4,Local
+97,Monterey Bay Aquarium,7,Research
+98,Monterey Bay Fisheries Trust,6,NGO
+99,Monterey Bay Foundation,6,NGO
+100,Monterey Bay Mermaid,4,Local
+101,Monterey Bay National Marine Sanctuary,3,Regional
+102,Monterey Bay Seaweeds,4,Local
+103,Monterey County Weekly,10,Media
+104,Monterey Herald,10,Media
+105,Montrose Settlements Restoration Program,3,Regional
+106,Moss Landing Marine Laboratories,7,Research
+107,National Center for Ecological Analysis and Synthesis,7,Research
+108,National Fish and Wildlife Foundation,6,NGO
+109,National Marine Sanctuary Foundation,6,NGO
+110,National Oceanic and Atmospheric Administration,1,Federal
+111,National Park Service,1,Federal
+112,Noozark,10,Media
+113,Northcoast Environmental Center,7,Research
+114,Noyo Center for Marine Science,7,Research
+115,Noyo Harbor District,4,Local
+116,Noyo Ocean Collective,6,NGO
+117,Occidental College,7,Research
+118,Ocean Rainforest,6,NGO
+119,Ocean Visions,6,NGO
+120,Oregon Coast Aquarium,7,Research
+121,Oregon Department of Fish and Wildlife,2,State
+122,Oregon Kelp Alliance,6,NGO
+123,Oregon State University,7,Research
+124,Pacific Coast Sportfishing Magazine,10,Media
+125,Pacific States Marine Fisheries Commission,2,State
+126,Pacific Urchin Harvesters Association,6,NGO
+127,Partnership for Interdisciplinary Studies of Coastal Oceans,2,State
+128,Paua Marine Research Group,7,Research
+129,Port of Long Beach,4,Local
+130,Port of Los Angeles,4,Local
+131,Port of San Diego,4,Local
+132,Puget Sound Restoration Fund,6,NGO
+133,Pycnopodia Recovery Working Group,6,NGO
+134,Redwood Elementary,7,Research
+135,Reef Check,6,NGO
+136,Reef Environmental Education Foundation,6,NGO
+137,Running Tide,6,NGO
+138,SAFE,0,Other
+139,Salesforce,0,Other
+140,San Diego Association of Governments,4,Local
+141,San Diego State University,7,Research
+142,San Jose State University,7,Research
+143,Santa Monica Bay Restoration Commission,4,Local
+144,Save Our Shores,6,NGO
+145,Sea Forest,6,NGO
+146,Sea Otter Savvy,6,NGO
+147,Selkie Land + Sea,4,Local
+148,Sepia Lux,4,Local
+149,Sherwood Valley Band of Pomo Indians,8,Tribal
+150,Sonoma State University,7,Research
+151,Southern California Coastal Ocean Observing System,7,Research
+152,Southern California Coastal Water Research Project,7,Research
+153,Southern California Edison,3,Regional
+154,Southern California Marine Institute,7,Research
+155,Stanford University,7,Research
+156,Strategic Earth Consulting,9,Consulting
+157,Sunken Seaweed,6,NGO
+158,Surfrider Foundation,6,NGO
+159,Sustainable Ocean Alliance,6,NGO
+160,Tableau,0,Other
+161,The Bay Foundation,6,NGO
+162,The Cultured Abalone Farm,4,Local
+163,The Jetlagged,6,NGO
+164,The Mercury News,10,Media
+165,The Nature Conservancy,6,NGO
+166,The Sea Ranch Association,6,NGO
+167,Tolowa Dee ni' Nation,8,Tribal
+168,Tribal Government,8,Tribal
+169,Tribal Marine Stewards Network,8,Tribal
+170,Trinidad Coastal Land Trust,8,Tribal
+171,Trinidad Rancheria,8,Tribal
+172,United States Air Force,1,Federal
+173,United States Congress,1,Federal
+174,United States Fish and Wildlife Service,1,Federal
+175,United States Geological Survey,1,Federal
+176,United States Navy,1,Federal
+177,Universidad Autonoma de Baja California Mexico,7,Research
+178,University of Alaska Fairbanks,7,Research
+179,University of California Berkeley,7,Research
+180,University of California Davis,7,Research
+181,University of California Irvine,7,Research
+182,University of California Los Angeles,7,Research
+183,University of California Merced,7,Research
+184,University of California San Diego,7,Research
+185,University of California Santa Barbara,7,Research
+186,University of California Santa Cruz,7,Research
+187,University of Massachusetts Boston,7,Research
+188,University of Miami,7,Research
+189,University of Nevada Reno,7,Research
+190,University of Oregon,7,Research
+191,University of Santa Barbara,7,Research
+192,University of Southern California,7,Research
+193,University of Washington,7,Research
+194,University of Wisconsin,7,Research
+195,University of Wisconsin Milwaukee,7,Research
+196,Washington State Department of Natural Resources,2,State
+197,Watermen's Alliance,6,NGO
+198,West Coast Ocean Alliance,6,NGO
+199,West Marin Compost Company,4,Local
+200,Wishtoyo Chumash Foundation,8,Tribal
+201,Wiyot Tribe,8,Tribal
+202,Woods Hole Oceanographic Institution,7,Research
+203,WSP,9,Consulting
+204,Yurok Tribe,8,Tribal
