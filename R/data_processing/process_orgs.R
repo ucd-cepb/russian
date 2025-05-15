@@ -88,8 +88,9 @@ clean_org <- function(x) {
       x=="Bamboo Reef Scuba Diving Centers" ~ "Bamboo Reef Scuba Diving Centers - Triton Spearfishing",
       x=='Urchin removal diver' ~ NA,
       x=="Stanford University (past)" ~ NA,
-      x=="co-PI Santa Barbara Coastal LTER site" ~ NA,
-      x=="Stillwater Cove urchin divers" ~ NA,
+      x=="co-PI Santa Barbara Coastal LTER site" ~ "University of California Santa Barbara - SBC LTER",
+      x=="PI - Seaweed CDR Project at UCSB" ~ "University of California Santa Barbara - Seaweed CDR Project",
+      x=="Stillwater Cove urchin divers" ~ "Stillwater Cove urchin divers",
       grepl(paste(c("Volunteer Diving groups","North Coast KelpFest!","Independent filmmaking","x",
                     "Triton Spearfishing",  # merged with _2
                     "ANCKR", # merged with _1
@@ -99,6 +100,7 @@ clean_org <- function(x) {
       TRUE ~ x
     ))
 }
+#
 
 
 
@@ -119,6 +121,12 @@ sn <- read_csv(here('confidential_data', 'processed', 'cleaned_social_network_wi
 ##   this is the cleaned up data set on the answer to the question: What are the main ways you learn about kelp forest-related issues?
 info <- read_csv(here('confidential_data', 'processed','cleaned_responseID_by_info_source_q9.csv'))
 
+## helpful Qs in the survey data
+qs_of_interest <- make_clean_names(c('ResponseId','Status',"RecipientLastName","RecipientFirstName",
+                                     "Q3 Individual_1",
+                                     colnames(dat_survey)[grepl('Q4',colnames(dat_survey))],
+                                     colnames(dat_survey)[grepl('Q9',colnames(dat_survey))]))
+
 
 
 # FIRST PASS: select direct observers. ------------------------------------
@@ -131,19 +139,19 @@ do <- unique(info %>%
 ## how many are not in the social network?
 length(which(!(do %in% sn$response_id))) # 24
 
-noSN_dat <- dat_survey %>% filter(response_id %in% do & !(response_id %in% sn$response_id)) %>% filter(finished=="True")
+noSN_dat <- dat_survey %>% filter(response_id %in% do & !(response_id %in% sn$response_id)) %>% filter(finished=="True" | response_id=='R_7DMyWjdBdNj6bfz')
 
 with(noSN_dat, table(q2))
 # No, I am involved on my own       Yes, I am involved on behalf of one organization or group 
 # 2                                                              11 
 # Yes, I am involved on behalf of several organizations or groups 
-# 4 
+# 5 
 
 
 
-# FIRST PASS: add direct observers to SN data frame --------------------------
+# FIRST PASS: add direct observers to SN data frame & Clean org names --------------------------
 
-## No, I am involved on my own
+### No, I am involved on my own ###
 tmp_add <- filter(noSN_dat, q2=='No, I am involved on my own')
 sn2 <- sn %>% bind_rows(data.frame(response_id=tmp_add$response_id) %>%
                              mutate(num_id=-1,
@@ -155,7 +163,7 @@ dim(sn) #995
 dim(sn2) #997
 
 
-## Yes, I am involved on behalf of one organization or group
+### Yes, I am involved on behalf of one organization or group ###
 tmp_add <- filter(noSN_dat, q2=='Yes, I am involved on behalf of one organization or group') %>%
   dplyr::select(response_id,q3_individual_1)
 ### fix up names
@@ -174,29 +182,70 @@ sn2 %<>% bind_rows(data.frame(response_id=tmp_add$response_id,
 dim(sn2) #1008
 
 
-## Yes, I am involved on behalf of several organizations or groups
+
+### Yes, I am involved on behalf of several organizations or groups ###
 do_add <- filter(noSN_dat, q2=='Yes, I am involved on behalf of several organizations or groups') %>%
   dplyr::select(response_id,starts_with('q3')) %>% dplyr::select(-q3_individual_1)
 ## Save the first listed as the org_name
 do_add %<>% mutate(org_name=clean_org(x=q3_several_1))
 ### melt
 do_add %<>% pivot_longer(starts_with('q3'), names_to='tmp', values_to='org_name2') %>% 
-  filter(!is.na(org_name2))
+  filter(!is.na(org_name2)) 
+do_add %<>% filter(tmp!='q3_several_1')
 ### one of the MLML responses is a duplicate
 do_add %<>% filter(org_name2 != "Moss Landing Marine Labs")
 ### adjust names
-do_add %<>% mutate(multi_orgs = clean_org(x=org_name2))
+do_add %<>% mutate(multi_org = clean_org(x=org_name2))
 
 ### merge to one column, in order
 do_add %<>% arrange(response_id, tmp) %>% group_by(response_id,org_name) %>%
   ## to make sure it worked in order
-  mutate(multi_orgs=paste0(multi_orgs,collapse=', '))
+  mutate(multi_org=paste0(multi_org,collapse=', '))
 ### get unique answers and address one particular survey response:
 # R_3REDy37W41gd9F7 q3_several_1 I am a commercial Nearshore Rockfish Fisherman
 # R_3REDy37W41gd9F7 q3_several_2 I was an Abalone Diver                        
 # R_3REDy37W41gd9F7 q3_several_3 I am a harbor Commissioner  
-do_add %<>% dplyr::select(response_id,org_name,multi_orgs) %>% distinct() %>%
+do_add %<>% dplyr::select(response_id,org_name,multi_org) %>% distinct() %>%
   mutate(org_name=ifelse(response_id=="R_3REDy37W41gd9F7", "Noyo Harbor Commission", org_name))  ## save this for next section
+
+
+
+# Revisit Research Universities: Multiple Groups --------------------------
+## these are research universities with multiple groups working in different locations. 
+
+### UCSB -- LTER, MPA/MLPA, SONGS? ###
+ucsb <- filter(sn2, grepl('University of California Santa Barbara', org_name))
+## add names 
+ucsb %<>% left_join(dat_survey %>% select(all_of(qs_of_interest)))
+
+ucsb %<>% rename(orig_org = org_name) %>%
+  mutate(org_name = case_when(
+    response_id %in% c('R_59T9thuNU6T04lX') ~ paste0(orig_org, ' - SONGS'),
+    response_id %in% c('R_5dnbJSY7qhuMdsB','R_1MEiTDdy7UTusoz') ~ paste0(orig_org, ' - MPA'),
+    response_id == 'R_6mwVifciTCq64Hs' ~  paste0(orig_org, ' - SONGS & MPA'),
+    .default=orig_org
+  ))
+
+#respondent "R_8h9I2A79jUPDFkN" already specifies LTER
+
+### Cal Poly Humboldt ###
+humboldt <- filter(sn2, grepl('California State Polytechnic University Humboldt', org_name))
+## add names 
+humboldt %<>% left_join(dat_survey %>% select(all_of(qs_of_interest)))
+
+humboldt %<>% rename(orig_org = org_name) %>%
+  mutate(org_name = case_when(
+    response_id %in% c('R_3uHTLrh3ea49nmF','R_1gumT7uft6SpkJY') ~ paste0(orig_org, ' - Kelp Culture'),
+    response_id %in% c('R_5rju7W12HtPajKX','R_1LY9bZGoDJpKr8U','R_7PSlOsSbZJnSQVt') ~ paste0(orig_org, ' - MPA'),
+    .default=orig_org
+  ))
+#respondents "R_1OwaKPJzCpBm5QR" and "R_1PTOVqgZmThkEyB" are in other programs at Cal Poly Humboldt
+
+
+### add to sn2 ###
+sn2 %<>% filter(!(response_id %in% ucsb$response_id) & !(response_id %in% humboldt$response_id)) %>%
+  bind_rows(select(ucsb,all_of(colnames(sn2)))) %>%
+  bind_rows(select(humboldt,all_of(colnames(sn2))))
 
 
 # Get info on multiple orgs -------------------------------------------------------
@@ -240,6 +289,8 @@ multis %<>% mutate(org_name=case_when(
 
 multis[which(is.na(multis$org_name)),] # 0 !
 
+## check ucsb multi orgs info
+
 
 # Org renaming (following process_social_network) -------------------------
 
@@ -280,6 +331,54 @@ multis %<>%
   rename(q3_severalx_1=q3_several_1, q3_severalx_2=q3_several_2) %>%
   mutate_at(.vars=vars(starts_with('q3_several_')), clean_org)
 
+
+
+
+
+# Revisit Research Universities: Multiple Groups --------------------------
+ucsb <- multis %>%
+  pivot_longer(all_of(c(starts_with('q'),starts_with('org'))),names_to='level',values_to='org_name') %>%
+  filter(grepl('University of California Santa Barbara', org_name)) %>%
+  select(response_id) %>% distinct() %>% left_join(multis)
+## add respondent names & corrected org names from sn2 (above)
+ucsb_new <- ucsb %>%
+  pivot_longer(all_of(c(starts_with('q'),starts_with('org'))),names_to='level',values_to='org_name') %>%
+  rename(orig_org=org_name) %>%
+  mutate(replace=ifelse(grepl('University of California Santa Barbara',orig_org), 1, 0)) %>%
+  left_join(filter(sn2,grepl('University of California Santa Barbara', org_name)) %>%
+              dplyr::select(response_id,org_name) %>% distinct() %>% mutate(replace=1)) %>%
+  left_join(dat_survey %>% select(all_of(qs_of_interest)))
+
+## move over original org names where ok -- includes one UCSB individual doing satellite / remote sensing work
+ucsb_new %<>% mutate(org_name=ifelse(is.na(org_name), orig_org, org_name))
+
+## pivot wider again and put back into multis df
+ucsb_new2 <- ucsb_new %>% select(response_id,level,org_name) %>%
+  pivot_wider(names_from = level, values_from=org_name)
+
+multis %<>% filter(!(response_id %in% ucsb_new2$response_id)) %>%
+  bind_rows(ucsb_new2)
+
+
+
+
+humboldt <- multis %>%
+  pivot_longer(all_of(c(starts_with('q'),starts_with('org'))),names_to='level',values_to='org_name') %>%
+  filter(grepl('Humboldt', org_name)) %>%
+  select(response_id) %>% distinct() %>% left_join(multis)
+## add respondent names & corrected org names from sn2 (above)
+humboldt_new <- humboldt %>%
+  left_join(filter(sn2,grepl('Humboldt', org_name)) %>% select(response_id, org_name) %>% distinct(), by='response_id')
+humboldt_new %<>% rename(org_name=org_name.x) %>% mutate(org_name=ifelse(org_name != org_name.y, org_name.y))
+## fix two duplicate orgs, one weird glitch in a several_5 cleanup
+humboldt_new %<>% mutate(org_name2=ifelse(response_id=='R_7PSlOsSbZJnSQVt', NA, org_name2),
+                         q3_several_5=ifelse(response_id=='R_1LY9bZGoDJpKr8U', 'Surfrider Foundation - Humboldt Chapter', q3_several_5))
+
+humboldt_new %<>% dplyr::select(-org_name.y)
+
+
+multis %<>% filter(!(response_id %in% humboldt_new$response_id)) %>%
+  bind_rows(humboldt_new)
 
 # Remove affiliations that are collaborations -----------------------------
 # 
@@ -330,14 +429,18 @@ multis %<>%
 
 ## merge all into one column!
 multis_collapse <- multis %>% 
-  dplyr::select(-starts_with('q3_severalx'), -in_collab,-alter) %>%
+  # dplyr::select(-starts_with('q3_severalx'), -in_collab,-alter) %>%
+  dplyr::select(-starts_with('q3_severalx')) %>%
   distinct() %>%
-  pivot_longer(cols=c(org_name2, starts_with('q3_several_')), names_to='tmp', values_to='all_orgs')
+  pivot_longer(cols=c(org_name2, starts_with('q3_several_')), names_to='tmp', values_to='all_orgs') %>%
+  filter(!is.na(all_orgs))
   
-multis_collapse %<>% filter(!is.na(all_orgs)) %>%
-  arrange(response_id,tmp) %>%
-  group_by(response_id) %>% 
+multis_collapse %<>% arrange(response_id,tmp) %>%
+  group_by(response_id,org_name) %>% 
   summarise(multi_org=paste0(unique(all_orgs), collapse=", "))
+
+## add  in the 
+multis_collapse %<>% bind_rows(do_add)
 
 
 ### check a few
@@ -348,12 +451,12 @@ multis_id <- left_join(multis_id, multis_collapse)
 # Save --------------------------------------------------------------------
 
 ## Just the organizations
-sn2 %>% left_join(multis_collapse,by='response_id') %>%
+sn2 %>% left_join(select(multis_collapse, response_id, multi_org),by='response_id') %>%
   dplyr::select(response_id,org_name,multi_org) %>% distinct() %>%
-  write_csv(here('confidential_data', 'processed','cleaned_multiple_orgs_2025-03-17.csv'))
+  write_csv(here('confidential_data', 'processed','cleaned_multiple_orgs_2025-04-30.csv'))
 
 
 ## Added into the social network
-sn2 %>% left_join(multis_collapse,by='response_id') %>%
-  write_csv(here('confidential_data', 'processed','cleaned_social_network_with_org_allDOs_2025-03-17.csv'))
+sn2 %>% left_join(select(multis_collapse, response_id, multi_org),by='response_id') %>%
+  write_csv(here('confidential_data', 'processed','cleaned_social_network_with_org_allDOs_2025-04-30.csv'))
 
