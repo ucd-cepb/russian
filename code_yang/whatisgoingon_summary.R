@@ -4,7 +4,7 @@ library(tidyverse)
 library(dplyr)
 library(paletteer)
 
-dat_survey <- read_csv("~/Desktop/R_stuff/kelp_restoration/data_files/dat_kelp_survey.csv")[-c(1,2),]
+dat_survey <- read_csv("data_yang/dat_kelp_survey.csv")[-c(1,2),]
 
 # Question 1 -----------
 
