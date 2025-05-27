@@ -97,7 +97,7 @@ question_4 <- dat_survey %>%
     ResponseId == "R_5p0hFxU61rtshee" ~ "Environmental management",
     TRUE ~ Q4_2))
 
-question_4 <- dat_survey %>%
+question_4 <- question_4 %>%
   mutate(Q4_3 = case_when(
     ResponseId == "R_73yGa8USaSXYR0T" ~ "People management",
     ResponseId == "R_3Hqxere4rGNArPa" ~ "People management",
@@ -134,43 +134,25 @@ question_4 <- question_4 %>%
   filter(!is.na(choice))
 
 question_4 <- question_4 %>%
-  add_column(add_column = "%")
-
-question_4 <- question_4 %>% 
-  rename(
-    label = add_column
-  )
-
-question_4 <- question_4 %>%
-  count(Q4) %>%
+  count(choice) %>%
   mutate(percentage = round(n / sum(n) * 100, 1))
 
+question_4 <- question_4 %>%
+   add_column(add_column = "%")
 
-
-question_4 %>%
-  mutate(response = factor(choice, c('Research', 'Environmental management', 'Advocacy or outreach', 'Harvesting or fishing or growing', 'Recreation or tourism', 'Planning or permitting', "People management", "Business operations", "Student"))) %>%
-  ggplot(., aes(x = fct_rev(response), fill = response)) +
-  geom_bar() +
-  theme_minimal(base_size = 13) + 
-  geom_text(stat = 'count', 
-            aes(label = ..count..),
-            position = position_dodge(width = 1),
-            size = 4.5,
-            hjust = -0.2) +
-  ggtitle("Question 4: Type of involvement") +
-  paletteer::scale_fill_paletteer_d("RColorBrewer::RdYlBu") +
-  coord_flip() +
-  xlab("") +
-  ylab("") +
-  theme(legend.position="none")
+question_4 <- question_4 %>% 
+   rename(
+      label = add_column
+   )
 
 question_4 %>%
-  mutate(response = factor(Q4, c('Research', 'Environmental management', 'Advocacy or outreach', 'Harvesting or fishing or growing', 'Recreation or tourism', 'Planning or permitting', 'People management', 'Business operations', 'Student'))) %>%
+  mutate(response = factor(choice, c('Research', 'Environmental management', 'Advocacy or outreach', 'Harvesting or fishing or growing', 'Recreation or tourism', 'Planning or permitting', 'People management', 'Business operations', 'Student'))) %>%
   ggplot(., aes(x = fct_rev(response), y = n, fill = response)) +
   geom_col() +
-  geom_text(aes(label = paste0(percentage, "%")), vjust = -0.5) +
+  geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
   paletteer::scale_fill_paletteer_d("RColorBrewer::RdYlBu") +
   coord_flip() +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.2))) +
   guides(fill=guide_legend(title=" ")) +
   labs(
     title = "Question 4: Type of involvement",
@@ -197,6 +179,18 @@ question_5 <- question_5 %>%
   pivot_longer(cols = -c(Q5_17, Q5_17_TEXT), names_to = "Q5", values_to = "county")
 
 question_5 <- question_5[!(is.na(question_5$county) | question_5$county==""), ]
+
+question_5 <- question_5 %>%
+   count(county) %>%
+   mutate(percentage = round(n / sum(n) * 100, 1))
+
+question_5 <- question_5 %>%
+   add_column(add_column = "%")
+
+question_5 <- question_5 %>% 
+   rename(
+      label = add_column
+   )
 
 question_5 <- question_5 %>%
   mutate(county = case_when(
@@ -255,40 +249,62 @@ question_5 <- question_5 %>%
 
 # colour of county by region
 question_5 %>%
-  mutate(county = factor(county, c("Del Norte", "Humboldt", "Mendocino", "Sonoma", "Marin", "San Francisco", "San Mateo", "Santa Cruz", "Monterey", "San Luis Obispo", "Santa Barbara", "Ventura", "Los Angeles", "Orange", "San Diego", "(all counties)"))) %>%
-  ggplot(., aes(x = fct_rev(county), fill = region)) +
-  geom_bar() +
-  theme_minimal(base_size = 13) + 
-  geom_text(stat = 'count', 
-            aes(label = ..count..),
-            position = position_dodge(width = 1),
-            size = 4.5,
-            hjust = -0.2) +
-  ggtitle("Question 5: County affiliation") +
-  coord_flip() +
-  paletteer::scale_fill_paletteer_d("ggthemes::excel_Median") +
-  xlab("") +
-  ylab("") +
-  #theme(legend.position="none")
-  guides(fill=guide_legend(title="Region"))
+   mutate(county = factor(county, c("Del Norte", "Humboldt", "Mendocino", "Sonoma", "Marin", "San Francisco", "San Mateo", "Santa Cruz", "Monterey", "San Luis Obispo", "Santa Barbara", "Ventura", "Los Angeles", "Orange", "San Diego", "(all counties)"))) %>%
+   ggplot(., aes(x = fct_rev(county), y = n, fill = region)) +
+   geom_col() +
+   geom_text(aes(label = paste0(percentage, "%")), vjust = 0.5, hjust = -0.1) +
+   paletteer::scale_fill_paletteer_d("ggthemes::excel_Median") +
+   coord_flip() +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+   guides(fill=guide_legend(title=" ")) +
+   labs(
+      title = "Question 5: County affiliation",
+      x = " ",
+      y = "Number of Responses"
+   ) +
+   theme_minimal()
 
 # binned by region
-question_5 %>%
-ggplot(data = ., aes(x = fct_rev(fct_infreq(region)), fill = region)) +
-  geom_bar() +
-  theme_minimal(base_size = 13) + 
-  geom_text(stat = 'count', 
-            aes(label = ..count..),
-            position = position_dodge(width = 1),
-            size = 4.5,
-            hjust = -0.2) +
-  ggtitle("Question 5: County affiliation") +
-  coord_flip() +
-  paletteer::scale_fill_paletteer_d("ggthemes::excel_Median") +
-  xlab("") +
-  ylab("") +
-  #theme(legend.position="none")
-  guides(fill=guide_legend(title="Region"))
+question_5.1 <- question_5 %>%
+   group_by(region) %>%
+   summarise(total_percentage = sum(percentage, na.rm = TRUE)) %>%
+   ungroup()
+
+question_5.1 <- question_5.1 %>%
+   mutate(region = case_when(
+      region == " north" ~ "north",
+      TRUE ~ region))
+
+question_5.1 <- question_5.1 %>%
+   mutate(region = case_when(
+      region == " central" ~ "central",
+      TRUE ~ region))
+
+question_5.1 <- question_5.1 %>%
+   mutate(region = case_when(
+      region == " south" ~ "south",
+      TRUE ~ region))
+
+question_5.1 <- question_5.1 %>%
+   mutate(region = case_when(
+      region == " all counties" ~ "all counties",
+      TRUE ~ region))
+
+   question_5.1 %>%
+      mutate(region = factor(region, levels = c('north', 'central', 'south', 'all counties'))) %>%
+      ggplot(aes(x = fct_rev(region), y = total_percentage, fill = region)) +
+      geom_col() +
+      geom_text(aes(label = paste0(total_percentage, "%")), vjust = 0.5, hjust = -0.1) +
+      paletteer::scale_fill_paletteer_d("ggthemes::excel_Median") +
+      coord_flip() +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+      guides(fill = guide_legend(title = " ")) +
+      labs(
+         title = "Question 5: County affiliation",
+         x = " ",
+         y = "Number of Responses"
+      ) +
+      theme_minimal()
 
 # Question 6 -----
 question_6 <- dat_survey %>% 
@@ -352,6 +368,19 @@ question_8 <- question_8 %>%
 question_8 <- question_8 %>%
   filter(!is.na(response))
 
+question_8 <- question_8 %>%
+   mutate(statement = case_when(
+      question == "Q8_1" ~ "resist",
+      question == "Q8_2" ~ "accept",
+      question == "Q8_3" ~ "direct",
+      question == "Q8_4" ~ "resist ",
+      question == "Q8_5" ~ "direct ",
+      question == "Q8_6" ~ "low risk low reward",
+      question == "Q8_7" ~ "high risk high reward",
+      question == "Q8_8" ~ "learn more"
+   ))
+
+# stacked barchart
 question_8 %>%
   mutate(question = factor(question, c('Q8_8', 'Q8_7', 'Q8_6', 'Q8_5', 'Q8_3', 'Q8_2', 'Q8_4', 'Q8_1'))) %>%
   mutate(response = factor(response, c("Strongly agree", "Somewhat agree", "Neither agree nor disagree", "Somewhat disagree", "Strongly disagree", "Don't know"))) %>%
@@ -367,7 +396,34 @@ question_8 %>%
   xlab("") +
   ylab("") +
   guides(fill=guide_legend(title=""))
+
+# grouped barchart
+question_8 <- question_8 %>%
+   mutate(
+      response = factor(response, levels = c(
+         "Strongly agree", "Somewhat agree", "Neither agree nor disagree", 
+         "Somewhat disagree", "Strongly disagree", "Don't know"
+      )),
+      statement = factor(statement, levels = c(
+         "resist", "resist ", "accept", "direct", "direct ", "low risk low reward", 
+         "high risk high reward", "learn more"
+      ))
+   )
   
+ggplot(question_8, aes(x = statement, fill = response)) +
+   geom_bar(position = "dodge") +
+   labs(
+      title = "Question 8: How much you agree or disagree with the following statements 
+                   about managing kelp forests",
+      x = " ",
+      y = "Count",
+      fill = "Response"
+   ) +
+   paletteer::scale_fill_paletteer_d("LaCroixColoR::PeachPear", direction = 1) +
+   theme_minimal() +
+   theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+
 # Question 9 ------
 question_9 <- dat_survey %>% 
   select(starts_with("Q9"))
@@ -397,9 +453,19 @@ question_9 <- question_9 %>%
   pivot_longer(cols = -c(Q9_10, Q9_10_TEXT), names_to = "question", values_to = "response")
 
 question_9 <- question_9 %>%
-  filter(!is.na(response))
+   filter(!is.na(response))
 
-group.colors.9 <- c('I directly observe conditions' = "#A44122", 'I attend meetings or workshops' = "#DB6725", 'I talk to scientists' ="#F28A32", 'I read scientific publications' = "#F0AE76", 'I collect or analyze data' = "#D6D4C9", 'I follow news, social media, or online forums' = "#A5BDCF", 'I talk to managers or regulators' = "#72A7CF", 'I use websites and data dashboards' = '#5C8FBB', 'I talk to fishers, harvesters, or growers' = "#3F709E")
+question_9 <- question_9 %>%
+   count(response) %>%
+   mutate(percentage = round(n / sum(n) * 100, 1))
+
+question_9 <- question_9 %>%
+   add_column(add_column = "%")
+
+question_9 <- question_9 %>% 
+   rename(
+      label = add_column
+   )
 
 question_9 %>%
   #mutate(repsonse = factor(response, c("I directly observe conditions", "I attend meetings or workshops", "I talk to scientists", "I read scientific publications", "I collect or analyze data", "I follow news, social media, or online forums", "I talk to managers or regulators", "I use websites and data dashboards", "I talk to fishers, harvesters, or growers"))) %>%
@@ -419,6 +485,21 @@ question_9 %>%
   ylab("") +
   theme(legend.position="none")
 
+question_9 %>%
+   ggplot(., aes(x = fct_rev(response), y = n, fill = response)) +
+   geom_col() +
+   geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
+   paletteer::scale_fill_paletteer_d("RColorBrewer::RdYlBu") +
+   coord_flip() +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+   guides(fill=guide_legend(title=" ")) +
+   labs(
+      title = "Question 9: Main ways you learn about kelp forest-related issues",
+      x = " ",
+      y = "Number of Responses"
+   ) +
+   theme_minimal()
+
 # Question 10 ---------
 question_10 <- dat_survey %>% 
   select(starts_with("Q10"))
@@ -433,7 +514,19 @@ question_10 <- question_10 %>%
   pivot_longer(cols = -c(Q10_10, Q10_10_TEXT), names_to = "question", values_to = "response")
 
 question_10 <- question_10 %>%
-  filter(!is.na(response))
+   filter(!is.na(response))
+
+question_10 <- question_10 %>%
+   count(response) %>%
+   mutate(percentage = round(n / sum(n) * 100, 1))
+
+question_10 <- question_10 %>%
+   add_column(add_column = "%")
+
+question_10 <- question_10 %>% 
+   rename(
+      label = add_column
+   )
 
 group.colors.10 <- c('Increasing direct relationships between scientists and non-scientists' = "#DB6725", 'Increasing the participation of scientists in policy efforts' ="#F28A32", 'Making research that is more management-relevant' = "#F0AE76", 'Communicating scientific results in simpler language' = "#D6D4C9", 'Promoting alternative forms of science (e.g. Indigenous knowledge)' = "#A5BDCF", 'Making it easier for the public to access scientific products' = "#72A7CF", 'Increasing public familiarity with scientific tools (e.g. electronic simulation maps)' = '#5C8FBB')
 
@@ -453,6 +546,22 @@ question_10 %>%
   xlab("") +
   ylab("") +
   theme(legend.position="none")
+
+question_10 %>%
+   ggplot(aes(x = fct_rev(response), y = n, fill = response)) +
+   geom_col() +
+   geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
+   paletteer::scale_fill_paletteer_d("RColorBrewer::RdYlBu") +
+   coord_flip() +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+   labs(
+      title = "Question 10: Main ways to improve integration of science 
+        and policy for managing kelp forests",
+      x = " ",
+      y = "Number of Responses"
+   ) +
+   theme_minimal() +
+   theme(legend.position = "none") 
 
 # Question 14 -------
 question_14 <- dat_survey %>% 
@@ -503,24 +612,33 @@ question_14 <- question_14 %>%
 
 question_14 <- question_14[!(is.na(question_14$response) | question_14$response==""), ]
 
-group.colors.14 <- c('Limited resources/staff time' = "#A44122", 'Regulatory obstacles' = "#DB6725", 'Lack of an overarching plan' ="#F28A32", 'Lack of adequate scientific information' = "#F0AE76", 'Distrust among potential partners' = "#A5BDCF", 'Lack of public support' = "#72A7CF", 'Lack of experience' = "#5C8FBB", 'Lack of suitable partners' = "#3F709E")
+question_14 <- question_14 %>%
+   count(response) %>%
+   mutate(percentage = round(n / sum(n) * 100, 1))
+
+question_14 <- question_14 %>%
+   add_column(add_column = "%")
+
+question_14 <- question_14 %>% 
+   rename(
+      label = add_column
+   )
 
 question_14 %>%
-  ggplot(., aes(x = fct_rev(fct_infreq(response)), fill = response)) +
-  geom_bar() +
-  theme_minimal(base_size = 13) + 
-  geom_text(stat = 'count', 
-            aes(label = ..count..),
-            position = position_dodge(width = 1),
-            size = 4.5,
-            hjust = -0.2) +
-  ggtitle("Question 14: Biggest barriers to partnering with others on kelp 
-                     forest-related issues") +
-  coord_flip() +
-  scale_fill_manual(values=group.colors.14) +
-  xlab("") +
-  ylab("") +
-  theme(legend.position="none")
+   ggplot(aes(x = fct_rev(response), y = n, fill = response)) +
+   geom_col() +
+   geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
+   paletteer::scale_fill_paletteer_d("RColorBrewer::RdYlBu") +
+   coord_flip() +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.07))) +
+   labs(
+      title = "Question 14: Biggest barriers to partnering with others on kelp 
+                     forest-related issues",
+      x = " ",
+      y = "Number of Responses"
+   ) +
+   theme_minimal() +
+   theme(legend.position = "none") 
 
 # Question 15 --------
 question_15 <- dat_survey %>% 
@@ -532,23 +650,32 @@ question_15 <- question_15 %>%
 question_15 <- question_15 %>%
   filter(!is.na(response))
 
-group.colors.15 <- c('Shared goals' = "#A44122", 'Reputation and trustworthiness' = "#DB6725", 'Prior experience' ="#F28A32", 'Funding opportunities' = "#F0AE76", 'Complementary activities' = "#A5BDCF", 'Authority to make decisions' = "#72A7CF", 'Ability to reach a broader network' = '#5C8FBB', 'Access to information' = "#3F709E")
+question_15 <- question_15 %>%
+   count(response) %>%
+   mutate(percentage = round(n / sum(n) * 100, 1))
+
+question_15 <- question_15 %>%
+   add_column(add_column = "%")
+
+question_15 <- question_15 %>% 
+   rename(
+      label = add_column
+   )
 
 question_15 %>%
-  ggplot(., aes(fct_rev(fct_infreq(response)), fill = response)) +
-  geom_bar() +
-  theme_minimal(base_size = 13) + 
-  geom_text(stat = 'count', 
-            aes(label = ..count..),
-            position = position_dodge(width = 1),
-            size = 4.5,
-            hjust = -0.2) +
-  ggtitle("Question 15: Most important factors when choosing partners") +
-  coord_flip() +
-  scale_fill_manual(values=group.colors.15) +
-  xlab("") +
-  ylab("") +
-  theme(legend.position="none")
+   ggplot(aes(x = fct_rev(response), y = n, fill = response)) +
+   geom_col() +
+   geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
+   paletteer::scale_fill_paletteer_d("RColorBrewer::RdYlBu") +
+   coord_flip() +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.07))) +
+   labs(
+      title = "Question 15: Most important factors when choosing partners",
+      x = " ",
+      y = "Number of Responses"
+   ) +
+   theme_minimal() +
+   theme(legend.position = "none")
 
 
   
