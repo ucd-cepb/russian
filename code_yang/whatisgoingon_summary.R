@@ -467,38 +467,24 @@ question_9 <- question_9 %>%
       label = add_column
    )
 
-question_9 %>%
-  #mutate(repsonse = factor(response, c("I directly observe conditions", "I attend meetings or workshops", "I talk to scientists", "I read scientific publications", "I collect or analyze data", "I follow news, social media, or online forums", "I talk to managers or regulators", "I use websites and data dashboards", "I talk to fishers, harvesters, or growers"))) %>%
-  #mutate(repsonse = factor(question, c("Q9_6", "Q9_4", "Q9_1", "Q9_8", "Q9_7", "Q9_5", "Q9_9", "Q9_3", "Q9_11"))) %>%
-  ggplot(., aes(x = fct_rev(fct_infreq(response)), fill = response)) +
-  geom_bar() +
-  theme_minimal(base_size = 13) + 
-  geom_text(stat = 'count', 
-            aes(label = ..count..),
-            position = position_dodge(width = 1),
-            size = 4.5,
-            hjust = -0.2) +
-  ggtitle("Question 9: Main ways you learn about kelp forest-related issues") +
-  coord_flip() +
-  scale_fill_manual(values=group.colors.9) +
-  xlab("") +
-  ylab("") +
-  theme(legend.position="none")
+group.colors.9 <- c('I directly observe conditions' = "#A44122", 'I attend meetings or workshops' = "#DB6725", 'I talk to scientists' ="#F28A32", 'I read scientific publications' = "#F0AE76", 'I collect or analyze data' = "#D6D4C9", 'I follow news, social media, or online forums' = "#A5BDCF", 'I talk to managers or regulators' = "#72A7CF", 'I use websites and data dashboards' = '#5C8FBB', 'I talk to fishers, harvesters, or growers' = "#3F709E")
 
 question_9 %>%
-   ggplot(., aes(x = fct_rev(response), y = n, fill = response)) +
+   ggplot(aes(x = fct_reorder(response, n), y = n, fill = response)) +
    geom_col() +
    geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
-   paletteer::scale_fill_paletteer_d("RColorBrewer::RdYlBu") +
+   scale_fill_manual(values=group.colors.9) +
    coord_flip() +
    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
-   guides(fill=guide_legend(title=" ")) +
+   guides(fill = guide_legend(title = " ")) +
    labs(
       title = "Question 9: Main ways you learn about kelp forest-related issues",
       x = " ",
       y = "Number of Responses"
    ) +
-   theme_minimal()
+   theme_minimal() +
+   theme(legend.position = "none") 
+
 
 # Question 10 ---------
 question_10 <- dat_survey %>% 
@@ -531,37 +517,21 @@ question_10 <- question_10 %>%
 group.colors.10 <- c('Increasing direct relationships between scientists and non-scientists' = "#DB6725", 'Increasing the participation of scientists in policy efforts' ="#F28A32", 'Making research that is more management-relevant' = "#F0AE76", 'Communicating scientific results in simpler language' = "#D6D4C9", 'Promoting alternative forms of science (e.g. Indigenous knowledge)' = "#A5BDCF", 'Making it easier for the public to access scientific products' = "#72A7CF", 'Increasing public familiarity with scientific tools (e.g. electronic simulation maps)' = '#5C8FBB')
 
 question_10 %>%
-  ggplot(., aes(x = fct_rev(fct_infreq(response)), fill = response)) +
-  geom_bar() +
-  theme_minimal(base_size = 13) + 
-  geom_text(stat = 'count', 
-            aes(label = ..count..),
-            position = position_dodge(width = 1),
-            size = 4.5,
-            hjust = -0.2) +
-  ggtitle("Question 10: Main ways to improve integration of science 
-          and policy for managing kelp forests") +
-  coord_flip() +
-  scale_fill_manual(values=group.colors.10) +
-  xlab("") +
-  ylab("") +
-  theme(legend.position="none")
-
-question_10 %>%
-   ggplot(aes(x = fct_rev(response), y = n, fill = response)) +
+   ggplot(aes(x = fct_reorder(response, n), y = n, fill = response)) +
    geom_col() +
    geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
-   paletteer::scale_fill_paletteer_d("RColorBrewer::RdYlBu") +
+   scale_fill_manual(values=group.colors.10) +
    coord_flip() +
    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+   guides(fill = guide_legend(title = " ")) +
    labs(
       title = "Question 10: Main ways to improve integration of science 
-        and policy for managing kelp forests",
+          and policy for managing kelp forests",
       x = " ",
       y = "Number of Responses"
    ) +
    theme_minimal() +
-   theme(legend.position = "none") 
+   theme(legend.position = "none")
 
 # Question 14 -------
 question_14 <- dat_survey %>% 
@@ -624,13 +594,16 @@ question_14 <- question_14 %>%
       label = add_column
    )
 
+group.colors.14 <- c('Limited resources/staff time' = "#A44122", 'Regulatory obstacles' = "#DB6725", 'Lack of an overarching plan' ="#F28A32", 'Lack of adequate scientific information' = "#F0AE76", 'Distrust among potential partners' = "#A5BDCF", 'Lack of public support' = "#72A7CF", 'Lack of experience' = "#5C8FBB", 'Lack of suitable partners' = "#3F709E")
+
 question_14 %>%
-   ggplot(aes(x = fct_rev(response), y = n, fill = response)) +
+   ggplot(aes(x = fct_reorder(response, n), y = n, fill = response)) +
    geom_col() +
    geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
-   paletteer::scale_fill_paletteer_d("RColorBrewer::RdYlBu") +
+   scale_fill_manual(values=group.colors.14) +
    coord_flip() +
-   scale_y_continuous(expand = expansion(mult = c(0, 0.07))) +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+   guides(fill = guide_legend(title = " ")) +
    labs(
       title = "Question 14: Biggest barriers to partnering with others on kelp 
                      forest-related issues",
@@ -638,7 +611,7 @@ question_14 %>%
       y = "Number of Responses"
    ) +
    theme_minimal() +
-   theme(legend.position = "none") 
+   theme(legend.position = "none")
 
 # Question 15 --------
 question_15 <- dat_survey %>% 
@@ -662,13 +635,16 @@ question_15 <- question_15 %>%
       label = add_column
    )
 
+group.colors.15 <- c('Shared goals' = "#A44122", 'Reputation and trustworthiness' = "#DB6725", 'Prior experience' ="#F28A32", 'Funding opportunities' = "#F0AE76", 'Complementary activities' = "#A5BDCF", 'Authority to make decisions' = "#72A7CF", 'Ability to reach a broader network' = '#5C8FBB', 'Access to information' = "#3F709E")
+
 question_15 %>%
-   ggplot(aes(x = fct_rev(response), y = n, fill = response)) +
+   ggplot(aes(x = fct_reorder(response, n), y = n, fill = response)) +
    geom_col() +
    geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
-   paletteer::scale_fill_paletteer_d("RColorBrewer::RdYlBu") +
+   scale_fill_manual(values=group.colors.15) +
    coord_flip() +
-   scale_y_continuous(expand = expansion(mult = c(0, 0.07))) +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+   guides(fill = guide_legend(title = " ")) +
    labs(
       title = "Question 15: Most important factors when choosing partners",
       x = " ",
@@ -676,6 +652,5 @@ question_15 %>%
    ) +
    theme_minimal() +
    theme(legend.position = "none")
-
 
   
