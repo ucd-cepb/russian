@@ -77,14 +77,24 @@ ggplot(question_2, aes(x = Q2, y = n, fill = Q2)) +
 
 
 # Question 3 (in progress) ----------
-question_3 <- dat_survey %>% 
-  select(org_name)
+nodelist <- read_csv("for_marissa/for_marissa - nodelist.csv")[-c(1,2),]
 
-question_3 <- subset(question_3, question_3$org_name != "")
+nodelist %>%
+   count(organization_label) %>%
+   mutate(percentage = round(n / sum(n) * 100, 1)) %>%
+   ggplot(aes(x = reorder(organization_label, percentage), y = percentage, fill = organization_label)) +
+   geom_col(show.legend = FALSE) +
+   geom_text(aes(label = paste0(percentage, "%")), hjust = -0.1) +
+   coord_flip() +
+   labs(
+      title = "Percentage of Survey Responses by Organization Type",
+      x = "Organization Type",
+      y = "Percentage of Responses"
+   ) +
+   theme_minimal() +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1)))
 
-
-
-# Question 4 (pie chart?) --------
+# Question 4 --------
 question_4 <- dat_survey %>%
   mutate(Q4_2 = case_when(
     ResponseId == "R_50sTP7MIe3Y7drH" ~ "Environmental management",
@@ -160,6 +170,13 @@ question_4 %>%
     y = "Number of Responses"
   ) +
   theme_minimal()
+
+# How many people chose 2+ answers
+dat_survey %>%
+   mutate(num_selected = rowSums(!is.na(across(Q4_1:Q4_11_TEXT)))) %>%
+   filter(num_selected >= 2) %>%
+   summarise(count = n())
+# ANSWER = 126 people worked in more than one county 
 
 # Question 5 -------
 question_5 <- dat_survey %>%
@@ -302,9 +319,21 @@ question_5.1 <- question_5.1 %>%
       labs(
          title = "Question 5: County affiliation",
          x = " ",
-         y = "Number of Responses"
+         y = "Proportion"
       ) +
       theme_minimal()
+   
+# How many people chose 2+ answers + "all counties"
+dat_survey %>%
+      mutate(num_selected = rowSums(!is.na(across(Q5_1:Q5_16)))) %>%
+      filter(num_selected >= 2) %>%
+      summarise(count = n())
+ # 96
+dat_survey %>%
+   filter(if_any(Q5_1:Q5_16, ~ . == "(all counties)")) %>%
+   summarise(count = n())
+ # 26
+# ANSWER = 122 people worked in more than one county 
 
 # Question 6 -----
 question_6 <- dat_survey %>% 
@@ -422,7 +451,6 @@ ggplot(question_8, aes(x = statement, fill = response)) +
    paletteer::scale_fill_paletteer_d("LaCroixColoR::PeachPear", direction = 1) +
    theme_minimal() +
    theme(axis.text.x = element_text(angle = 30, hjust = 1))
-
 
 # Question 9 ------
 question_9 <- dat_survey %>% 
