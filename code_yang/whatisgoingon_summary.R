@@ -1310,7 +1310,7 @@ question_8 <- question_8 %>%
       question == "Q8_8" ~ "learn more"
    ))
 
-# stacked barchart
+# Question 8 stacked barchart --------
 question_8 %>%
   mutate(question = factor(question, c('Q8_8', 'Q8_7', 'Q8_6', 'Q8_5', 'Q8_3', 'Q8_2', 'Q8_4', 'Q8_1'))) %>%
   mutate(response = factor(response, c("Strongly agree", "Somewhat agree", "Neither agree nor disagree", "Somewhat disagree", "Strongly disagree", "Don't know"))) %>%
@@ -1326,8 +1326,8 @@ question_8 %>%
   xlab("") +
   ylab("") +
   guides(fill=guide_legend(title=""))
-
-# grouped barchart
+ 
+# Question 8 grouped barchart --------
 question_8 <- question_8 %>%
    mutate(
       response = factor(response, levels = c(
@@ -1346,7 +1346,180 @@ ggplot(question_8, aes(x = statement, fill = response)) +
       title = "Question 8: How much you agree or disagree with the following statements 
                    about managing kelp forests",
       x = " ",
-      y = "Count",
+      y = "Number of responses",
+      fill = "Response"
+   ) +
+   paletteer::scale_fill_paletteer_d("LaCroixColoR::PeachPear", direction = 1) +
+   theme_minimal() +
+   theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+# Question 8.1 Preferences by region -------
+
+question_8.1 <- dat_survey %>% 
+   select(ResponseId, Q5_1, Q5_2, Q5_3, Q5_4, Q5_5, Q5_6, Q5_7, Q5_8, Q5_9, Q5_10, Q5_11, Q5_12, Q5_13, Q5_14, Q5_16, Q8_1, Q8_2, Q8_3, Q8_4, Q8_5, Q8_6, Q8_7, Q8_8)
+
+question_8.1 <- question_8.1 %>%
+   pivot_longer(cols = c(Q5_1, Q5_2, Q5_3, Q5_4, Q5_5, Q5_6, Q5_7, Q5_8, Q5_9, Q5_10, Q5_11, Q5_12, Q5_13, Q5_14, Q5_16), names_to = "county", values_to = "response")
+
+question_8.1<- question_8.1%>%
+   mutate(response = case_when(
+      response == "Del Notre" ~ "Del Norte",
+      TRUE ~ response))
+
+question_8.1[ , 'region'] = ""
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Ventura", paste(region, "south"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "San Diego", paste(region, "south"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Orange", paste(region, "south"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Los Angeles", paste(region, "south"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Santa Barbara", paste(region, "central"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "San Luis Obispo", paste(region, "central"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Monterey", paste(region, "central"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Santa Cruz", paste(region, "central"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Sonoma", paste(region, "north"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "San Mateo", paste(region, "north"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "San Francisco", paste(region, "north"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Mendocino", paste(region, "north"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Marin", paste(region, "north"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Humboldt", paste(region, "north"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "Del Norte", paste(region, "north"), region))
+
+question_8.1<- question_8.1%>%
+   mutate(region = if_else(response == "(all counties)", paste(region, "all counties"), region))
+
+question_8.1 <- question_8.1 %>%
+   pivot_longer(cols = c(Q8_1, Q8_2, Q8_3, Q8_4, Q8_5, Q8_6, Q8_7, Q8_8), names_to = "statement", values_to = "choice")
+
+question_8.1 <- question_8.1 %>%
+   mutate(choice = case_when(
+      choice == "Somewhat disgree" ~ "Somewhat disagree",
+      TRUE ~ choice))
+
+question_8.1 <- question_8.1 %>%
+   mutate(statement = case_when(
+      statement == "Q8_1" ~ "resist",
+      statement == "Q8_2" ~ "accept",
+      statement == "Q8_3" ~ "direct",
+      statement == "Q8_4" ~ "resist ",
+      statement == "Q8_5" ~ "direct ",
+      statement == "Q8_6" ~ "low risk low reward",
+      statement == "Q8_7" ~ "high risk high reward",
+      statement == "Q8_8" ~ "learn more"
+   ))
+
+question_8.2 <- question_8.1 %>% 
+   filter(str_detect(region, regex("south", ignore_case = TRUE)))
+
+question_8.2 <- question_8.2 %>%
+   mutate(
+      choice = factor(choice, levels = c(
+         "Strongly agree", "Somewhat agree", "Neither agree nor disagree", 
+         "Somewhat disagree", "Strongly disagree", "Don't know"
+      )),
+      statement = factor(statement, levels = c(
+         "resist", "resist ", "accept", "direct", "direct ", "low risk low reward", 
+         "high risk high reward", "learn more"
+      ))
+   )
+
+question_8.2 <- question_8.2 %>%
+   filter(!is.na(choice))
+
+ggplot(question_8.2, aes(x = statement, fill = choice)) +
+   geom_bar(position = "dodge") +
+   labs(
+      title = "Southern California",
+      x = " ",
+      y = "Number of responses",
+      fill = "Response"
+   ) +
+   paletteer::scale_fill_paletteer_d("LaCroixColoR::PeachPear", direction = 1) +
+   theme_minimal() +
+   theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+question_8.3 <- question_8.1 %>% 
+   filter(str_detect(region, regex("central", ignore_case = TRUE)))
+
+question_8.3 <- question_8.3 %>%
+   mutate(
+      choice = factor(choice, levels = c(
+         "Strongly agree", "Somewhat agree", "Neither agree nor disagree", 
+         "Somewhat disagree", "Strongly disagree", "Don't know"
+      )),
+      statement = factor(statement, levels = c(
+         "resist", "resist ", "accept", "direct", "direct ", "low risk low reward", 
+         "high risk high reward", "learn more"
+      ))
+   )
+
+question_8.3 <- question_8.3 %>%
+   filter(!is.na(choice))
+
+ggplot(question_8.3, aes(x = statement, fill = choice)) +
+   geom_bar(position = "dodge") +
+   labs(
+      title = "Central California",
+      x = " ",
+      y = "Number of responses",
+      fill = "Response"
+   ) +
+   paletteer::scale_fill_paletteer_d("LaCroixColoR::PeachPear", direction = 1) +
+   theme_minimal() +
+   theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+question_8.4 <- question_8.1 %>% 
+   filter(str_detect(region, regex("north", ignore_case = TRUE)))
+
+question_8.4 <- question_8.4 %>%
+   mutate(
+      choice = factor(choice, levels = c(
+         "Strongly agree", "Somewhat agree", "Neither agree nor disagree", 
+         "Somewhat disagree", "Strongly disagree", "Don't know"
+      )),
+      statement = factor(statement, levels = c(
+         "resist", "resist ", "accept", "direct", "direct ", "low risk low reward", 
+         "high risk high reward", "learn more"
+      ))
+   )
+
+question_8.4 <- question_8.4 %>%
+   filter(!is.na(choice))
+
+ggplot(question_8.4, aes(x = statement, fill = choice)) +
+   geom_bar(position = "dodge") +
+   labs(
+      title = "Northern California",
+      x = " ",
+      y = "Number of responses",
       fill = "Response"
    ) +
    paletteer::scale_fill_paletteer_d("LaCroixColoR::PeachPear", direction = 1) +
@@ -1396,23 +1569,40 @@ question_9 <- question_9 %>%
       label = add_column
    )
 
-group.colors.9 <- c('I directly observe conditions' = "#A44122", 'I attend meetings or workshops' = "#DB6725", 'I talk to scientists' ="#F28A32", 'I read scientific publications' = "#F0AE76", 'I collect or analyze data' = "#D6D4C9", 'I follow news, social media, or online forums' = "#A5BDCF", 'I talk to managers or regulators' = "#72A7CF", 'I use websites and data dashboards' = '#5C8FBB', 'I talk to fishers, harvesters, or growers' = "#3F709E")
+#group.colors.9 <- c('I directly observe conditions' = "#A44122", 'I attend meetings or workshops' = "#DB6725", 'I talk to scientists' ="#F28A32", 'I read scientific publications' = "#F0AE76", 'I collect or analyze data' = "#D6D4C9", 'I follow news, social media, or online forums' = "#A5BDCF", 'I talk to managers or regulators' = "#72A7CF", 'I use websites and data dashboards' = '#5C8FBB', 'I talk to fishers, harvesters, or growers' = "#3F709E")
 
-question_9 %>%
-   ggplot(aes(x = fct_reorder(response, n), y = n, fill = response)) +
+question_9 <- question_9 %>%
+   arrange(desc(n)) %>%
+   mutate(fill_color = scales::col_numeric(
+      palette = c("#cce5ff", "#004c99"),
+      domain = range(n)
+   )(n))
+
+ggplot(question_9, aes(x = fct_reorder(response, n), y = n, fill = fill_color)) +
    geom_col() +
    geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
-   scale_fill_manual(values=group.colors.9) +
+   scale_fill_identity() +  # Use actual fill values from column
    coord_flip() +
    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
-   guides(fill = guide_legend(title = " ")) +
    labs(
       title = "Question 9: Main ways you learn about kelp forest-related issues",
-      x = " ",
+      x = NULL,
       y = "Number of Responses"
    ) +
    theme_minimal() +
    theme(legend.position = "none") 
+
+ggplot(question_9, aes(x = fct_reorder(response, n), y = n)) +
+   geom_col(fill = "#004c99") +  # single color for all bars
+   geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
+   coord_flip() +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+   labs(
+      title = "Question 9: Main ways you learn about kelp forest-related issues",
+      x = NULL,
+      y = "Number of Responses"
+   ) +
+   theme_minimal()
 
 
 # Question 10 ---------
@@ -1443,13 +1633,20 @@ question_10 <- question_10 %>%
       label = add_column
    )
 
-group.colors.10 <- c('Increasing direct relationships between scientists and non-scientists' = "#DB6725", 'Increasing the participation of scientists in policy efforts' ="#F28A32", 'Making research that is more management-relevant' = "#F0AE76", 'Communicating scientific results in simpler language' = "#D6D4C9", 'Promoting alternative forms of science (e.g. Indigenous knowledge)' = "#A5BDCF", 'Making it easier for the public to access scientific products' = "#72A7CF", 'Increasing public familiarity with scientific tools (e.g. electronic simulation maps)' = '#5C8FBB')
+#group.colors.10 <- c('Increasing direct relationships between scientists and non-scientists' = "#DB6725", 'Increasing the participation of scientists in policy efforts' ="#F28A32", 'Making research that is more management-relevant' = "#F0AE76", 'Communicating scientific results in simpler language' = "#D6D4C9", 'Promoting alternative forms of science (e.g. Indigenous knowledge)' = "#A5BDCF", 'Making it easier for the public to access scientific products' = "#72A7CF", 'Increasing public familiarity with scientific tools (e.g. electronic simulation maps)' = '#5C8FBB')
+
+question_10 <- question_10 %>%
+   arrange(desc(n)) %>%
+   mutate(fill_color = scales::col_numeric(
+      palette = c("#cce5ff", "#004c99"),
+      domain = range(n)
+   )(n))
 
 question_10 %>%
-   ggplot(aes(x = fct_reorder(response, n), y = n, fill = response)) +
+   ggplot(aes(x = fct_reorder(response, n), y = n, fill = fill_color)) +
    geom_col() +
    geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
-   scale_fill_manual(values=group.colors.10) +
+   scale_fill_identity() +
    coord_flip() +
    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
    guides(fill = guide_legend(title = " ")) +
@@ -1461,6 +1658,20 @@ question_10 %>%
    ) +
    theme_minimal() +
    theme(legend.position = "none")
+
+ggplot(question_10, aes(x = fct_reorder(response, n), y = n)) +
+   geom_col(fill = "#004c99") +  # single color for all bars
+   geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
+   coord_flip() +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+   labs(
+      title = "Question 10: Main ways to improve integration of science 
+          and policy for managing kelp forests",
+      x = NULL,
+      y = "Number of Responses"
+   ) +
+   theme_minimal()
+
 
 # Question 14 -------
 question_14 <- dat_survey %>% 
@@ -1523,16 +1734,23 @@ question_14 <- question_14 %>%
       label = add_column
    )
 
-group.colors.14 <- c('Limited resources/staff time' = "#A44122", 'Regulatory obstacles' = "#DB6725", 'Lack of an overarching plan' ="#F28A32", 'Lack of adequate scientific information' = "#F0AE76", 'Distrust among potential partners' = "#A5BDCF", 'Lack of public support' = "#72A7CF", 'Lack of experience' = "#5C8FBB", 'Lack of suitable partners' = "#3F709E")
+#group.colors.14 <- c('Limited resources/staff time' = "#A44122", 'Regulatory obstacles' = "#DB6725", 'Lack of an overarching plan' ="#F28A32", 'Lack of adequate scientific information' = "#F0AE76", 'Distrust among potential partners' = "#A5BDCF", 'Lack of public support' = "#72A7CF", 'Lack of experience' = "#5C8FBB", 'Lack of suitable partners' = "#3F709E")
+
+question_14 <- question_14 %>%
+   arrange(desc(n)) %>%
+   mutate(fill_color = scales::col_numeric(
+      palette = c("#cce5ff", "#004c99"),
+      domain = range(n)
+   )(n))
 
 question_14 %>%
-   ggplot(aes(x = fct_reorder(response, n), y = n, fill = response)) +
+   ggplot(aes(x = fct_reorder(response, n), y = n, fill = fill_color)) +
    geom_col() +
    geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
-   scale_fill_manual(values=group.colors.14) +
-   coord_flip() +
+   scale_fill_identity() +
    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
    guides(fill = guide_legend(title = " ")) +
+   coord_flip() +
    labs(
       title = "Question 14: Biggest barriers to partnering with others on kelp 
                      forest-related issues",
@@ -1564,16 +1782,23 @@ question_15 <- question_15 %>%
       label = add_column
    )
 
-group.colors.15 <- c('Shared goals' = "#A44122", 'Reputation and trustworthiness' = "#DB6725", 'Prior experience' ="#F28A32", 'Funding opportunities' = "#F0AE76", 'Complementary activities' = "#A5BDCF", 'Authority to make decisions' = "#72A7CF", 'Ability to reach a broader network' = '#5C8FBB', 'Access to information' = "#3F709E")
+#group.colors.15 <- c('Shared goals' = "#A44122", 'Reputation and trustworthiness' = "#DB6725", 'Prior experience' ="#F28A32", 'Funding opportunities' = "#F0AE76", 'Complementary activities' = "#A5BDCF", 'Authority to make decisions' = "#72A7CF", 'Ability to reach a broader network' = '#5C8FBB', 'Access to information' = "#3F709E")
+
+question_15 <- question_15 %>%
+   arrange(desc(n)) %>%
+   mutate(fill_color = scales::col_numeric(
+      palette = c("#cce5ff", "#004c99"),
+      domain = range(n)
+   )(n))
 
 question_15 %>%
-   ggplot(aes(x = fct_reorder(response, n), y = n, fill = response)) +
+   ggplot(aes(x = fct_reorder(response, n), y = n, fill = fill_color)) +
    geom_col() +
    geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
-   scale_fill_manual(values=group.colors.15) +
-   coord_flip() +
+   scale_fill_identity() +
    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
    guides(fill = guide_legend(title = " ")) +
+   coord_flip() +
    labs(
       title = "Question 15: Most important factors when choosing partners",
       x = " ",
@@ -1582,4 +1807,15 @@ question_15 %>%
    theme_minimal() +
    theme(legend.position = "none")
 
+ggplot(question_15, aes(x = fct_reorder(response, n), y = n)) +
+   geom_col(fill = "#004c99") +  # single color for all bars
+   geom_text(aes(label = paste0(percentage, "%")), vjust = 0, hjust = -0.1) +
+   coord_flip() +
+   scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+   labs(
+      title = "Question 15: Most important factors when choosing partners",
+      x = NULL,
+      y = "Number of Responses"
+   ) +
+   theme_minimal()
   
