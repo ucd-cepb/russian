@@ -20,7 +20,7 @@ id,organization,organization_type,organization_label
 19,California Marine Sanctuary Foundation,6,NGO
 20,California Ocean Protection Council,2,State
 21,California Ocean Science Trust,6,NGO
-22,California Sea Grant,0,?
+22,California Sea Grant,7,Research
 23,California Sea Urchin Commission,6,NGO
 24,California Seaweed Festival,4,Local
 25,California State Lands Commission,2,State 
@@ -33,7 +33,7 @@ id,organization,organization_type,organization_label
 32,California State University Monterey Bay,7,Research
 33,California State University Northridge,7,Research
 34,Catalina Island Marine Institute,7,Research
-35,CCCoP,0,Other
+35,Coastal Coupling Community of Practice Executive Committee,7,Research
 36,Channel Islands National Marine Sanctuary,3,Regional
 37,City College of San Francisco,7,Research
 38,City of Fort Bragg,4,Local
