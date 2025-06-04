@@ -2,6 +2,8 @@
 library(tidyverse)
 library(statnet)
 library(ggnetwork)
+
+dat_survey <- read_csv("data_yang/dat_kelp_survey.csv")[-c(1,2),]
 all.edge <- read_csv("for_marissa/for_marissa - edgelist2.csv")
 all.node <- read_csv("for_marissa/for_marissa - nodelist.csv")
 

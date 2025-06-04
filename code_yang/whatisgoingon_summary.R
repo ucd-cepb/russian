@@ -6,6 +6,7 @@ library(paletteer)
 
 dat_survey <- read_csv("data_yang/dat_kelp_survey.csv")[-c(1,2),]
 
+dat_survey$Q9_7
 # Question 1 -----------
 
 question_1 <- dat_survey %>% 
