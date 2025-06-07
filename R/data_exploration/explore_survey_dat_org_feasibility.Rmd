@@ -1,0 +1,312 @@
+---
+title: "Feasibility Synthesis prep"
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
+date: "2025-05-28"
+---
+
+## Description
+
+Explore survey questions related to organizational feasibility: managers’ understanding of a strategy as possible. This perception is influenced by managers’ individual worldviews and understanding of the environmental system / strategy risk,  as well as the culture of a particular community, organization, and society at large.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, messages=FALSE)
+
+# Set up  -----------------------------------------------------------------
+library(readr)
+library(tidyverse) 
+library(dplyr) 
+library(tidyr) 
+library(here)
+library(magrittr)
+library(janitor)
+#
+library(igraph)
+library(bipartite)
+library(ggalluvial)
+#
+source(here('R','subfxn','fill_adjacency_matrix.R'))
+source(here('R','subfxn','fill_bipartite_adjacency_matrix.R'))
+# Data --------------------------------------------------------------------
+## social network (processed)
+kelp.edge <- read_csv(here('confidential_data','processed','cleaned_social_network_with_org_2025-03-14.csv'))
+
+kelp.orgs <- dplyr::select(kelp.edge, response_id, org_name) %>% distinct() %>%
+  mutate(org_name=ifelse(is.na(org_name), 'Individual',org_name))
+
+
+## survey data
+sdat_all <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv')) %>%
+  clean_names() 
+sdat <-  sdat_all %>% slice(-c(1:2))
+## remove non-CA and non-kelp respondents. ## counties q was number 5
+sdat %<>% filter(!(q5_17_text %in% c("Baja California","Ensenada, Mexico")))
+sdat %<>% filter(q1 != 'I have no involvement in kelp forest-related issues')
+
+## organizations
+orgs <- read_csv(here('confidential_data','processed','cleaned_social_network_with_org_2025-02-28.csv'))
+orgs %<>% select(response_id,org_name) %>% distinct()
+
+## location info
+loc <- read_csv(here('confidential_data','processed','cleaned_responseID_by_county.csv'))
+cs_response <- filter(loc, county %in% c('Mendocino','Monterey'))
+```
+
+## Who is a "manager?"
+
+**Survey Question: Which words or phrases best describe your involvement in kelp forest-related issues?**
+
+Sidebar: What is the **response rate** for this question?
+```{r}
+involve <-  sdat %>% 
+  dplyr::select(response_id, starts_with("q4")) %>%
+  filter(if_all(starts_with("q4"), is.na)) %>%
+  mutate(q9_1='no response') %>%
+  bind_rows(
+    sdat %>% 
+      dplyr::select(response_id, starts_with("q4")) %>%
+      filter(!if_all(starts_with("q4"), is.na))
+  ) %>% 
+  pivot_longer(cols = -c(response_id), names_to = "tmp", values_to = "involved") %>%
+  dplyr::select(-tmp) %>% filter(!is.na(involved))
+
+length(unique(filter(involve, involved != "no response")$response_id))/length(unique(involve$response_id))
+```
+
+How many people are involved in "Environmental management" or "Planning or permitting" or "People management" for a state or federal agency?
+```{r}
+mng <- involve %>%
+  left_join(orgs) %>%
+  filter(involved %in% c("Planning or permitting","Environmental management")) %>%
+  filter(org_name %in% c('United States Fish and Wildlife Service', 'Tribal Government', 'InterTribal Sinkyone Wilderness Council', 'Elkhorn Slough National Estuarine Research Reserve', 'Channel Islands National Marine Sanctuary', 'California Sea Grant', 'California Ocean Science Trust', 'California OPC','CDFW','Greater Farallones Association' ))
+
+length(unique(mng$response_id))
+```
+
+
+What if we don't filter by organization?
+```{r}
+mng2 <- filter(involve, involved %in% c("Planning or permitting", "Environmental management")) %>%
+  select(-involved) %>%
+  left_join(involve, by='response_id')
+length(unique(mng2$response_id))
+```
+
+That's a lot of people. what organizations do they work on behalf of?
+```{r fig.height=10,fig.width=10}
+mng2 %<>% left_join(orgs)
+
+mng2 %>%
+  filter(involved %in% c("Planning or permitting","Environmental management")) %>%
+  group_by(org_name, involved) %>% 
+  summarise(n=length(unique(response_id))) %>%
+  ggplot(aes(y=org_name, x=involved,fill=n)) + 
+  geom_tile() +
+  theme_bw() + theme(axis.text.x=element_text(angle=45,hjust=1))
+```
+
+
+## Resist, Accept, Transform?
+
+We should let kelp forests change without interference ("no interference")
+We should try to restore kelp forests to a previous state
+We should try to transform kelp forests to withstand future challenges ("transform")
+
+
+### Managers
+
+What is the response rate among managers (small subset):
+```{r}
+managing <-  sdat %>% 
+  filter(response_id %in% mng$response_id) %>%
+  dplyr::select(response_id, starts_with("q8"))
+
+act <- dplyr::select(managing, response_id, q8_1, q8_2, q8_3) %>%
+  rename(q1_restore_to_previous_state=q8_1,
+         q2_no_interference=q8_2,
+         q3_transform=q8_3)
+
+act %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
+  mutate(response_cat=ifelse( likert != "Don't know" & !is.na(likert), "answered",likert)) %>%
+  group_by(question8, response_cat) %>% summarise(n=length(unique(response_id))) %>% mutate(response_rate=n/length(unique(mng$response_id))) %>%
+  dplyr::select(-n) %>% pivot_wider(names_from=question8, values_from=response_rate)
+```
+
+
+What is the response rate among managers (large subset):
+```{r}
+managing2 <-  sdat %>% 
+  filter(response_id %in% mng2$response_id) %>%
+  dplyr::select(response_id, starts_with("q8"))
+
+act2 <- dplyr::select(managing2, response_id, q8_1, q8_2, q8_3) %>%
+  rename(q1_restore_to_previous_state=q8_1,
+         q2_no_interference=q8_2,
+         q3_transform=q8_3)
+
+act2 %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
+  mutate(response_cat=ifelse( likert != "Don't know" & !is.na(likert), "answered",likert)) %>%
+  group_by(question8, response_cat) %>% summarise(n=length(unique(response_id))) %>% mutate(response_rate=n/length(unique(mng2$response_id))) %>%
+  dplyr::select(-n) %>% pivot_wider(names_from=question8, values_from=response_rate)
+```
+
+
+
+Distribution of responses:
+```{r}
+lk_order <- c("Strongly disagree","Somewhat disagree", "Neither agree nor disagree","Somewhat agree","Strongly agree","Don't know")
+act %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
+  mutate(likert=ifelse(likert=='Somewhat disgree', 'Somewhat disagree', likert)) %>%
+  filter(!is.na(likert)) %>%
+    group_by(question8, likert) %>% summarise(n=length(unique(response_id))) %>%
+  ggplot(aes(y=question8, x=n, fill=fct_relevel(likert, lk_order))) + 
+  geom_col() +
+  labs(y='', title='Managers (govt orgs)') +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw() + theme(axis.text.x=element_text(angle=45,hjust=1))
+```
+
+```{r}
+act2 %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
+  mutate(likert=ifelse(likert=='Somewhat disgree', 'Somewhat disagree', likert)) %>%
+  filter(!is.na(likert)) %>%
+    group_by(question8, likert) %>% summarise(n=length(unique(response_id))) %>%
+  ggplot(aes(x=question8, y=n, fill=fct_relevel(likert, lk_order))) + 
+  geom_col() +
+  labs(x='', title='Managers (all orgs)') +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw() 
+```
+
+
+Did people respond to these as though they were mutually exclusive? 
+
+The graph below shows in the left column "We should try to restore kelp forests to a previous state"
+and the right column "We should try to transform kelp forests to withstand future challenges"
+```{r fig.width=10}
+myA <- act %>% dplyr::select(q1_restore_to_previous_state,q3_transform) %>%
+  rename(v1=q1_restore_to_previous_state, v2=q3_transform) %>%
+fill_bipartite_adjacency_matrix(empty_A = NULL, weights=TRUE)
+
+
+as.data.frame(myA) %>% rownames_to_column(var='q1_restore_to_previous_state') %>%
+  pivot_longer(!starts_with('q1'), names_to='q3_transform', values_to='count') %>%
+  ggplot(aes(axis1=fct_relevel(q1_restore_to_previous_state, lk_order), axis2=fct_relevel(q3_transform,lk_order), y=count)) +
+  geom_alluvium(aes(fill=q1_restore_to_previous_state)) +
+  geom_stratum(width = 1/12, aes(fill=q1_restore_to_previous_state), color = "black") +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  labs(x='Question (restore --> transform)', title='Managers (govt)') +
+  scale_fill_manual(values=c('gray85','cadetblue4','cadetblue1','coral4','coral'), name='Likert') +
+  theme_bw() + theme(legend.position='none')
+```
+
+
+
+## Restoration methods
+
+We should focus on trying new restoration techniques ("new")
+We should prioritize low risk restoration techniques ("prioritize low risk")
+We should prioritize high risk restoration techniques with large potential benefits ("high risk large benefit")
+
+
+### Managers
+
+```{r}
+rest <- dplyr::select(managing, response_id, q8_4, q8_5) %>%
+  rename(q4_scale_up_current=q8_4, q5_new=q8_5)
+risk <- dplyr::select(managing, response_id, q8_6, q8_7) %>%
+  rename(q6_prioritize_low_risk=q8_6, q7_high_risk_large_benefit=q8_7)
+
+rest2 <- dplyr::select(managing2, response_id, q8_4, q8_5) %>%
+  rename(q4_scale_up_current=q8_4, q5_new=q8_5)
+risk2 <- dplyr::select(managing2, response_id, q8_6, q8_7) %>%
+  rename(q6_prioritize_low_risk=q8_6, q7_high_risk_large_benefit=q8_7)
+```
+
+
+Distribution of responses:
+```{r}
+risk %>% pivot_longer(2:3, names_to='question8', values_to='likert') %>%
+  bind_rows( rest %>% pivot_longer(2:3, names_to='question8', values_to='likert') ) %>%
+  mutate(likert=ifelse(likert=='Somewhat disgree', 'Somewhat disagree', likert)) %>%
+  filter(!is.na(likert)) %>%
+    group_by(question8, likert) %>% summarise(n=length(unique(response_id))) %>%
+  ggplot(aes(y=question8, x=n, fill=fct_relevel(likert, lk_order))) + 
+  geom_col() +
+  labs(y='', title='Managers (govt)') +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw()
+```
+
+```{r}
+risk2 %>% pivot_longer(2:3, names_to='question8', values_to='likert') %>%
+  bind_rows( rest2 %>% pivot_longer(2:3, names_to='question8', values_to='likert') ) %>%
+  mutate(likert=ifelse(likert=='Somewhat disgree', 'Somewhat disagree', likert)) %>%
+  filter(!is.na(likert)) %>%
+    group_by(question8, likert) %>% summarise(n=length(unique(response_id))) %>%
+  ggplot(aes(x=question8, y=n, fill=fct_relevel(likert, lk_order))) + 
+  geom_col() +
+  labs(x='', title='Managers (all orgs)') +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw() + theme(axis.text.x=element_text(angle=45,hjust=1))
+```
+
+Did people respond to these as though they were mutually exclusive? Not really.
+```{r fig.width=10}
+lk_order <- c('Strongly agree','Somewhat agree','Neither agree nor disagree','Somewhat disgree','Strongly disagree','No answer')
+myA <- risk %>% dplyr::select(q6_prioritize_low_risk,q7_high_risk_large_benefit) %>%
+  rename(v1=q6_prioritize_low_risk, v2=q7_high_risk_large_benefit) %>%
+fill_bipartite_adjacency_matrix(empty_A = NULL, weights=TRUE)
+
+as.data.frame(myA) %>% rownames_to_column(var='q6_prioritize_low_risk') %>%
+  pivot_longer(!starts_with('q6'), names_to='q7_high_risk_large_benefit', values_to='count') %>%
+  mutate(q6_prioritize_low_risk=factor(q6_prioritize_low_risk, lk_order),
+         q7_high_risk_large_benefit=factor(q7_high_risk_large_benefit,lk_order)) %>%
+  ggplot(aes(axis1=q6_prioritize_low_risk, axis2=q7_high_risk_large_benefit, y=count)) +
+  geom_alluvium(aes(fill=q6_prioritize_low_risk)) +
+  geom_stratum(width = 1/12, aes(fill=q6_prioritize_low_risk), color = "black") +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  labs(x='Question ( prioritize low risk ----> prioritize high risk, high benefit',title='Managers (govt)') +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw() + theme(legend.position='none')
+```
+
+### Monterey / Mendocino
+
+```{r}
+csdat <-  sdat %>% 
+  filter(!(response_id %in% mng$response_id)) %>%
+  filter(response_id %in% cs_response$response_id) %>%
+  dplyr::select(response_id, starts_with("q8"))
+
+rest3 <- dplyr::select(csdat, response_id, q8_4, q8_5) %>%
+  rename(q4_scale_up_current=q8_4, q5_new=q8_5)
+risk3 <- dplyr::select(csdat, response_id, q8_6, q8_7) %>%
+  rename(q6_prioritize_low_risk=q8_6, q7_high_risk_large_benefit=q8_7)
+
+
+act3 %>% pivot_longer(2:4, names_to='question8', values_to='likert') %>%
+  mutate(response_cat=ifelse( likert != "Don't know" & !is.na(likert), "answered",likert)) %>%
+  group_by(question8, response_cat) %>% summarise(n=length(unique(response_id))) %>% mutate(response_rate=n/length(unique(mng$response_id))) %>%
+  dplyr::select(-n) %>% pivot_wider(names_from=question8, values_from=response_rate)
+```
+
+Distribution of responses:
+```{r}
+lk_order <- rev(c('Strongly agree','Somewhat agree','Neither agree nor disagree','Somewhat disagree','Strongly disagree','No answer'))
+risk3 %>% pivot_longer(2:3, names_to='question8', values_to='likert') %>%
+  bind_rows( rest3 %>% pivot_longer(2:3, names_to='question8', values_to='likert') ) %>%
+  mutate(likert=ifelse(likert=='Somewhat disgree', 'Somewhat disagree', likert)) %>%
+  filter(!is.na(likert)) %>%
+    group_by(question8, likert) %>% summarise(n=length(unique(response_id))) %>%
+  ggplot(aes(y=question8, x=n, fill=fct_relevel(likert, lk_order))) + 
+  geom_col() +
+  labs(y='', title='Respondents involved in Mendocino, Monterey',subtitle='(Exclusive of Managers)') +
+  scale_fill_manual(values=c('coral4','coral','gray85','cadetblue1','cadetblue4','gray10'), name='Likert') +
+  theme_bw()
+```
+
+
