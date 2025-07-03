@@ -51,7 +51,9 @@ po/*~
 rsconnect/
 
 # Confidential files
-confidential_data/
+confidential_data/raw/*
+confidential_data/processed/*
+confidential_data/*/**.csv
 R/data_processing/kelp_network_v2.R
 R/data_processing/process_social_network.R
 R/data_processing/whatisgoingon_summary.R
