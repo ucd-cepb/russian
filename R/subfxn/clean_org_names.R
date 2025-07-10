@@ -8,10 +8,10 @@
 #' 
 #' Last updated: 7/3/2025
 #'
-#' @param data a data frame that contains *at least* two columns: `org_name` = the names to clean, `response_id` = unique respondent ID.
+#' @param data a vector of the names to clean
 #' @param collab true / false. TRUE: organization names represent a collaboration / coordination / communication tie. **this is important because individual names may be over written if FALSE is incorrectly chosen.
 #' @param return_original true / false. FALSE: return output as a 2-col data frame: response ID and org name. TRUE: return output as a 3-col data frame, with third column the original organization names
-#' @return if !collab: vector or list (if return_original). if collab: data frame  (because 3 organizations are folded into DISES). 
+#' @return vector or list (if return_original)
 #' @examples
 #' 
 #' dat_survey <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv'))  %>%
@@ -24,44 +24,46 @@
 #' question_3_clean <- clean_org_names(data=dplyr::select(dat_survey, response_id,org_name), ind_fix=TRUE)
 #' 
 #' @export
-clean_org_names <- function(data, collab = FALSE, return_original = FALSE){
+clean_org_names <- function(x, collab = FALSE, return_original = FALSE){
   
-  x <- as.character(data$org_name)
   if(!collab){
     ## these are from people listing what orgs they work on behalf of
   out <- 
     case_when(
-      grepl(paste(c('Humboldt','NEREO','Student assistant with Sean Craig'),collapse="|"), x) ~ "California State Polytechnic University Humboldt",
+      grepl('NEREO',x) ~ "California State Polytechnic University Humboldt - North coast Evaluation of Reef Ecosystems Organization",
+      grepl(paste(c('Cal Poly Humboldt','Student assistant with Sean Craig'),collapse="|"), x,ignore.case = TRUE) ~ "California State Polytechnic University Humboldt",
       grepl(paste(c('Reef check','reef check','reefcheck','Reef Check','ReefCheck',"Reefcheck"),collapse="|"), x) ~ "Reef Check",
       grepl(paste(c('moss landing','Moss Landing','MLML','Moss landing',"Moss Landing Marine Labs","Moss landing marine labs"),collapse="|"), x) ~ "Moss Landing Marine Laboratories",
       grepl(paste(c("Sunflower Sea Star Laboratory","Sunflower Star Lab","https://www.sunflowerstarlab.org/"),collapse="|"),x) ~ "Moss Landing Marine Laboratories - Sunflower Star Laboratory",
+      x=="Association of Zoos and Aquariums SAFE Sunflower Sea Star" ~ "Association of Zoos and Aquariums - SAFE Sunflower Sea Star",
       x=="Moss Landing Marine Labs Aquaculture Center" ~ "Moss Landing Marine Laboratory - Aquaculture Center",
       grepl(paste(c('Giant Giant Kelp','g2kr','giant giant kelp','G2KR','Great Great Kelp',
                     'UrchinsKelpOtters',"Giant Kelp Project","Giant Giant Kelp Restoration Project",
                     "Giant Giant Kelp Restoration Project (G2KR)",
                     "Giant kelp restoration project - g2kr",
-                    "Great Great Kelp Restoration"),collapse="|"), x) ~ "Giant Giant Kelp Forest Restoration Project",
+                    "Great Great Kelp Restoration"),collapse="|"), x) ~ "Giant Giant Kelp Restoration Project",
       grepl(paste(c('UCSC','UC Santa Cruz'),collapse="|"), x) ~ "University of California Santa Cruz",
       grepl(paste(c('CA Santa Barbara','California, Santa Barbara',"UC Santa Barbara"),collapse="|"),x) ~ "University of California Santa Barbara",
       grepl(paste(c("Bodega marine labs","Bodega Marine Laboratory"),collapse="|"), x) ~ "University of California Davis - Bodega Marine Laboratory",
-      grepl(paste(c('UC Davis','Uc Davis','Uc davis','California Davis','California, Davis'),collapse="|"), x) ~ "University of California Davis",
+      grepl(paste(c('UC Davis','Uc Davis','Uc davis','California Davis','California, Davis','uc davis'),collapse="|"), x) ~ "University of California Davis",
       grepl(paste(c('UC Berkeley','UCB','Uc berkeley'),collapse="|"), x) ~ "University of California Berkeley",
       grepl('U.S. Geological Survey', x) ~ "US Geological Survey",
       grepl(paste(c('CDFW','CALIFORNIA DEPARTMENT OF FISH AND WILDLIFE', 
                     'CA Dept of Fish and Wildlife',
                     'California Department of Fish and Wildlife (working with opc as our contractee)',
                     'Fish and Wildlife'),collapse="|"), x) ~ "California Department of Fish and Wildlife",
-      grepl('Sea Urchin Commission', x) ~ "California Sea Urchin Commission",
+      grepl('Sea Urchin Commission', x, ignore.case=TRUE) ~ "California Sea Urchin Commission",
       grepl(paste(c('Earth equty', 'Earth equity'),collapse="|"), x) ~ "Earth Equity",
       grepl('Cal Poly Pomona', x) ~ "California State Polytechnic University Pomona",
       grepl('USFWS', x) ~ "US Fish and Wildlife Service",
       grepl(paste(c('CA Ocean Protection Council','California Ocean Protection Council','Calif Ocean Protection Council'),collapse='|'),x) ~ 'California Ocean Protection Council',
       x=='California Ocean Protection Council (contracted by them)' ~ 'California Ocean Protection Council',
-      x=='UC San Diego' ~ "University of California San Diego", 
+      x=='UC San Diego' ~ "University of California San Diego",
+      x=="San Diego state university" ~ "San Diego State University", 
       grepl(paste(c("Watermens Alliance","Watermans Alliance","Waterman's Alliance"),collapse="|"), x) ~ "Watermen's Alliance",
       grepl(paste(c("GFNMS Advisory Council","Greater Farralones"),collapse="|"), x) ~ 'Greater Farallones National Marine Sanctuary',
       x=="Ocean Rainforest Inc" ~ 'Ocean Rainforest',
-      x=="Coastal Stewardship Task Force, The Sea Ranch Association" ~ "The Sea Ranch Association: Coastal Stewardship Task Force",
+      x=="Coastal Stewardship Task Force, The Sea Ranch Association" ~ "The Sea Ranch Association - Coastal Stewardship Task Force",
       grepl(paste(c("Nature Conservancy","TNC","The Nature Conservancy CA"),collapse='|'),x) ~ "The Nature Conservancy",
       x=="Vantuna Research Group at Occidental College" ~ "Occidental College - Vantuna Research Group",
       x=="Sherwood Valley Rancheria" ~ "Sherwood Valley Band of Pomo Indians",
@@ -79,7 +81,7 @@ clean_org_names <- function(data, collab = FALSE, return_original = FALSE){
       x=="The Kelp Forest Alliance" ~ "Kelp Forest Alliance",
       x=="SBC LTER" ~ "University of California Santa Barbara - SBC LTER",
       x=="MBNMS" ~ "Monterey Bay National Marine Sanctuary",
-      x=="Scripps Institution of Oceanography" ~ "University of California San Diego - Scripps Institution of Oceanography",
+      grepl("Scripps",x) & !grepl("Birch",x) ~ "University of California San Diego - Scripps Institution of Oceanography",
       x=="Birch Aquarium" ~  "University of California San Diego - Scripps Institution of Oceanography - Birch Aquarium",
       x=="Monterey Abalone Co." ~ "Monterey Abalone Company",
       x=="Bamboo Reef Scuba Diving Centers" ~ "Bamboo Reef Scuba Diving Centers - Triton Spearfishing",
@@ -87,17 +89,25 @@ clean_org_names <- function(data, collab = FALSE, return_original = FALSE){
       x=="Stanford University (past)" ~ NA,
       x=="co-PI Santa Barbara Coastal LTER site" ~ "University of California Santa Barbara - SBC LTER",
       x=="PI - Seaweed CDR Project at UCSB" ~ "University of California Santa Barbara - Seaweed CDR Project",
+      x=="The Cultured Abalone Farm LLC" ~ "The Cultured Abalone Farm",
+      x=="WSP (env consulting)" ~ "WSP",
+      x=="Greater Farallones and Cordell Bank National Marine Sanctuaries" ~ "Greater Farallones National Marine Sanctuary, Cordell Bank National Marine Sanctuary",
+      x=="I am a harbor Commissioner" ~ "Noyo Harbor",
       x=="Stillwater Cove urchin divers" ~ "Stillwater Cove urchin divers",
-      grepl(paste(c("Volunteer Diving groups","North Coast KelpFest!","Independent filmmaking","x",
-                    "Triton Spearfishing",  # merged with _2
+      x %in% c("Triton Spearfishing",  # merged with _2
+                    "I am a commercial Nearshore Rockfish Fisherman",
+                    "I was an Abalone Diver", "Urchin removal diver"
+               ) ~ "Individual: Commercial or Recreational Fishing", 
+      x=="Independent filmmaking" ~ "Individual: Photographer",
+      x=="Volunteer Diving groups" ~ "Individual: Diver",
+      x=="North Coast KelpFest!" ~ "North Coast Kelp Fest",
+      grepl(paste(c("x",
                     "ANCKR", # merged with _1
+                    "Decline to state",
                     "CPC"    # name?
       ),collapse='|'),x) ~ NA, 
-      x=="Greater Farallones and Cordell Bank National Marine Sanctuaries" ~ "Greater Farallones National Marine Sanctuary, Cordell Bank National Marine Sanctuary",
       TRUE ~ x
     )
-  if(!return_original){ return(out) }
-  if(return_original){ return( list(orig=data$org_name, new=out) )
   
   } else if(collab){
       ## these are from people listing collaborators
@@ -121,7 +131,7 @@ clean_org_names <- function(data, collab = FALSE, return_original = FALSE){
       
       x=="Amah Mutsun" ~ "Amah Mutsun Land Trust",
       
-      x %in% c("Andrew kim","Andrew Kim - MLML","Andrew Kim MLML") ~ "Moss Landing Marine Laboratories: Andrew Kim"  "Andrew Kim- MLML" ~  "Andrew Kim, MLML" ~ , 
+      x %in% c("Andrew kim","Andrew Kim - MLML","Andrew Kim MLML","Andrew Kim- MLML","Andrew Kim, MLML") ~ "Moss Landing Marine Laboratories: Andrew Kim", 
       x=="Moss Landing Marine Labs Aquaculture Center" ~ "Moss Landing Marine Laboratories - Aquaculture Center", 
       x %in% c("Moss Landing marine labs","Moss landing marine labs",
                       "Moss Landing Marine Laboratory","Moss Landing Marine Lab","Moss landing",
@@ -353,7 +363,7 @@ clean_org_names <- function(data, collab = FALSE, return_original = FALSE){
      x=="Rafael Cuveus-Uribe, Cal Poly Humboldt" ~ "California State Polytechnic University Humboldt: Rafael Cuevas Uribe",
      x=="Telonicher Marine Lab" ~ "California State Polytechnic University Humboldt - Telonicher Marine Lab",
      
-     grepl("NEREO",x) ~ "California State Polytechnic University Humboldt: Northcoast Evaluation of Reef Ecosystems Organization",
+     grepl("NEREO",x) ~ "California State Polytechnic University Humboldt - North coast Evaluation of Reef Ecosystems Organization",
      grepl(paste0(c('Cal Poly Humboldt','CalPoly Humboldt','Humbolt state','HSU'),collapse="|"),x) ~ "California State Polytechnic University Humboldt",
      
      x=="Cal Poly Pomona" ~ "California State Polytechnic University Pomona",
@@ -403,13 +413,12 @@ clean_org_names <- function(data, collab = FALSE, return_original = FALSE){
               "NOAA CINMS" ) ~ "Channel Islands National Marine Sanctuary",
      
      x=="Chris Goldblatt of Fish Reef Project (fishreef.org)" ~ "Fish Reef Project: Chris Goldblatt",
-     x=="City of fort bragg" ~ "City of Fort Bragg",
-     x=="City of Ft Bragg" ~ "City of Fort Bragg",
+     x %in% c("City of fort bragg","City of Ft Bragg") ~ "City of Fort Bragg",
      x=="Sarah McCormick, City of Fort Bragg" ~ "City of Fort Bragg: Sarah McCormick",
      grepl("Redwood Elementary", x) ~ "Redwood Elementary",
      x=="Coastal Conservation Association - California Chapter" ~ "Coastal Conservation Association California",
      x=="Hank Goebel" ~ "Coastal Conservation Association California: Hank Goebel",
-     x=="Coastal Stewardship Task Force, The Sea Ranch Association" ~ "The Sea Ranch Association: Coastal Stewardship Task Force",
+     x=="Coastal Stewardship Task Force, The Sea Ranch Association" ~ "The Sea Ranch Association - Coastal Stewardship Task Force",
      x=="Col. David Lopez, USAF (ret.)" ~ "David Lopez",
      x=="CSU Agricultural Research Institute" ~ "California State University Agricultural Research Institute",
      x %in% c("CSU Monterey Bay","CSUMB") ~ "California State University Monterey Bay",
@@ -418,7 +427,7 @@ clean_org_names <- function(data, collab = FALSE, return_original = FALSE){
      x=="Maya Munstermann, expert scientist" ~ "University of California Berkeley: Maya Munstermann",
      x %in% c("UC Berkeley")~ "University of California Berkeley",
      grepl("Pondella",x) ~ "Occidental College - Vantuna Research Group: Dan Pondella",
-     x=="Vantuna Research Group, Occidental College" ~ "Occidental College - Vantuna Research Group",
+     grepl("Vantuna Research Group",x) & !grepl("Pondella",x) ~ "Occidental College - Vantuna Research Group",
      grepl(paste0(c("Dan sweezy","Dan Sweazy","Dan Swezey"),collapse="|"),x, ignore.case=TRUE) ~ "Kashia Band of Pomo Indians: Dan Swezey",
      x=="KASHIA" ~ "Kashia Band of Pomo Indians",
      x=="Dandy Fish Company (fish processor)" ~ "Dandy Fish Company",
@@ -486,7 +495,7 @@ clean_org_names <- function(data, collab = FALSE, return_original = FALSE){
      x=="Green Wave" ~ "GreenWave",
      x=="REEF,  Janna Nichols" ~ "Reef Environmental Education Foundation: Janna Nichols",
      x=="Rep. Huffman (district 2)" ~ "United States Congress: Jared Huffman",
-     x=="Rodrigo Beas-Lunas (ABC Ensenada)" ~ "Universidad Autonoma de Baja California Mexico: Rodrigo Beas-Lunas",
+     x=="Rodrigo Beas-Lunas (ABC Ensenada)" ~ "Universidad Autónoma de Baja California: Rodrigo Beas-Lunas",
      x=="Rosa Laucci, Tolowa Dee-ni' Nation" ~ "Tolowa Dee-ni' Nation: Rosa Laucci",
      x %in% c("Tolowa Dee ni' Nation", "Tolowa Dee-Ni' Nation") ~ "Tolowa Dee-ni' Nation",
      x=="SalesForce" ~ "Salesforce",
@@ -522,28 +531,28 @@ clean_org_names <- function(data, collab = FALSE, return_original = FALSE){
      x=="Earth equty" ~ "Earth Equity",
      x=="WSP (env consulting)" ~ "WSP",
      x=="West Coast Ocean alliance" ~ "West Coast Ocean Alliance",
-     ########################################################################################
+     
      # Individuals
      ## --note-Mary standardized "commercial fisher" "diver" etc.
-     x=="Byron Kohler (urchin diver" ~ "Urchin Diver: Byron Kohler",
-     x=="Gary Trumper- urchin diver" ~ "Urchin Diver: Gary Trumper",
-     x=="Mickey Kitahara- urchin diver" ~ "Urchin Diver: Mickey Kitahara",
-     x=="Urchin removal diver" ~ "Urchin Diver",
-     x=="Many Kelp Restoration Divers" ~ "Divers",
-     x=="commercial fishermen in San Diego" ~ "Fishers",
+     x=="Byron Kohler (urchin diver" ~ "Commercial Urchin Diver: Byron Kohler",
+     x=="Gary Trumper- urchin diver" ~ "Commercial Urchin Diver: Gary Trumper",
+     x=="Mickey Kitahara- urchin diver" ~ "Commercial Urchin Diver: Mickey Kitahara",
+     x=="Urchin removal diver" ~ "Urchin Divers",
+     x=="Many Kelp Restoration Divers" ~ "Urchin Divers",
+     x=="commercial fishermen in San Diego" ~ "Commercial Urchin Diver",
      x=="Urchin removal" ~ "Urchin Divers",
      x=="Dale Glanz" ~ "Dale Glanz",
-     x=="Caspar Cove kelp restoration project Jon Holcomb" ~ "Fisher: Jon Holcomb",
-     x=="Erik Owen (commercial fisher)" ~ "Fisher: Erik Owen",
-     x=="Ernest (Tad) Thompson (commercial fisher)" ~ "Fisher: Ernest Thompson",
-     x=="Jeffrey Gritsch (commercial fisher)" ~ "Fisher: Jeffrey Gritsch",
-     grepl("Mark Gmeiner",x) ~ "Fisher: Mark Gmeiner",
+     x=="Caspar Cove kelp restoration project Jon Holcomb" ~ "Commercial Urchin Diver: Jon Holcomb",
+     x=="Erik Owen (commercial fisher)" ~ "Commercial Urchin Diver: Erik Owen",
+     x=="Ernest (Tad) Thompson (commercial fisher)" ~ "Commercial Urchin Diver: Ernest Thompson",
+     x=="Jeffrey Gritsch (commercial fisher)" ~ "Commercial Urchin Diver: Jeffrey Gritsch",
+     grepl("Mark Gmeiner",x) ~ "Commercial Urchin Diver: Mark Gmeiner",
      # Grant Downie is on the urchin commission, urchin diver, kelp restoration specialist, etc
-     grepl(paste0(c("Grant Downey","Grant Downie"),collapse="|"),x,ignore.case=TRUE) ~ "Fisher: Grant Downie",
-     x=="Pat Downie (commercial fisher)" ~ "Fisher: Pat Downie",
-     x=="Jeremy George Petty (commercial fisher)" ~ "Fisher: Jeremy George Petty",
+     grepl(paste0(c("Grant Downey","Grant Downie"),collapse="|"),x,ignore.case=TRUE) ~ "Commercial Urchin Diver: Grant Downie",
+     x=="Pat Downie (commercial fisher)" ~ "Commercial Urchin Diver: Pat Downie",
+     x=="Jeremy George Petty (commercial fisher)" ~ "Commercial Urchin Diver: Jeremy George Petty",
      grepl("Josie Iselin",x) ~ "Artist: Josie Iselin",
-     x=="Kevin Quider (commercial fisher)" ~ "Fisher: Kevin Quider",
+     x=="Kevin Quider (commercial fisher)" ~ "Commercial Urchin Diver: Kevin Quider",
      x=="Patrick Webster, science communicator and underwater photographer" ~ "Photographer: Pat Webster",
      x=="Roger Carlson, Roger Carlson Photography" ~ "Photographer: Roger Carlson",
      x=="Ron McPeak" ~ "Photographer: Ron McPeak",
@@ -551,26 +560,10 @@ clean_org_names <- function(data, collab = FALSE, return_original = FALSE){
      
      TRUE ~ x
     )
-    
-    # we need to add DISES organizations, since we only put in UC Davis as a collaborator above.
-    data$new_org <- out
-    dises_to_add <- filter(data, new_org=="University of California Davis - Kelp Restoration as an Integrated Socio-Ecological System") %>%
-      select(response_id)
-    
-    dises_to_add %<>% mutate(new_org='Cal Poly Humboldt') %>%
-      bind_rows(dises_to_add %>% mutate(new_org='UC Santa Cruz'))
-    
-    pisco_to_add <- filter(data, new_org=="Partnership for Interdisciplinary Studies of Coastal Oceans") %>%
-      select(response_id)
-    ###################################
-    pisco_to_add %<>% mutate() ..
-    #######################################
-    out <- data %>% bind_rows(dises_to_add) %>% select(response_id,new_org)
-  
-  
-  if(!return_original){ return(out) }
-  if(return_original){ return( list(orig=data$org_name, new=out) )  }
   }  # end if(collab)
   
+  if(!return_original){ return(out) }
+  if(return_original){ return( list(orig=data, new=out) )  }
+
   
 }

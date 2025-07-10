@@ -60,3 +60,4 @@ R/data_processing/whatisgoingon_summary.R
 R/data_processing/kelp_network_alters_counties.R
 
 russian.Rproj
+data/sen/processed_by_responseID_alters_field.csv
