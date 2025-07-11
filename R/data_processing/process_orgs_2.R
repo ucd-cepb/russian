@@ -51,4 +51,22 @@ question_11 %<>% mutate(clean_org_name=clean_org_names(org_name, collab=TRUE))
 ## make decisions on "NA" answers
 View(filter(question_11, is.na(clean_org_name)))
 
-
+## check answers that didn't change
+View(filter(question_11, org_name==clean_org_name))
+## to change round 1...
+# UCSB (Ospina, J. Smith)
+# SAFE
+# none
+# UCLA; Kyle Cavanuagh
+# 	
+# UC Davis (Baskett et al)
+# Dandy Fish Company (fish processor)
+# Morgan and Ian (North Coast Reef Check)
+# Opc SeaGrant cdfw + KRMP
+# Many many others
+# And many others..
+# Trinidad Rancheria
+# CCCoP
+# Greater Farallones Association kelp team (Rietta Hohman)
+# SJSU Moss Landing Marine Labs - Scott Hamiltom
+# Office of Habitat Conservation - Natalie C-Manning and Julia Royster
