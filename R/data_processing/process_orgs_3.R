@@ -1,16 +1,9 @@
 ############### Process survey data on ego organization ############### 
 #
-# Adjust processed social network data frame for richer info on 
-#   which organizations survey respondents work for. This includes (1)
-#   adding organizations for respondents who answered q2 as "Yes, 
-#   I am involved on behalf of several organizations or groups,"
-#   and (2) processing organization names for individuals who did not 
-#   provide alters (and therefore were excluded from the first pass of)
-#   processing social network data from the survey).
-#
-# For now, this script only completes this process for individuals
-#   who responded to QUESTION 9 (info source) by saying that they 
-#   directly observed kelp. 
+# Adjust processed social network data frame for overlap in  
+#   which organizations survey respondents *work on behalf of,*
+#   and which they *work directly with.* 
+# For "rules" on how this is done, check file: doc >> METHODS_survey_data_processing.docx
 #
 # Mary Fisher
 #
@@ -29,79 +22,6 @@ library(janitor)
 #
 
 
-## custom fxn
-clean_org <- function(x) {
-  x <- as.character(x)
-  return(
-    case_when(
-      grepl(paste(c('Humboldt','NEREO','Student assistant with Sean Craig'),collapse="|"), x) ~ "California State Polytechnic University Humboldt",
-      grepl(paste(c('Reef check','reef check','reefcheck','Reef Check','ReefCheck',"Reefcheck CA"),collapse="|"), x) ~ "Reef Check",
-      grepl(paste(c('moss landing','Moss Landing','MLML','Moss landing',"Moss Landing Marine Labs","Moss landing marine labs"),collapse="|"), x) ~ "Moss Landing Marine Laboratories",
-      grepl(paste(c("Sunflower Sea Star Laboratory","Sunflower Star Lab","https://www.sunflowerstarlab.org/"),collapse="|"),x) ~ "Moss Landing Marine Laboratories - Sunflower Star Laboratory",
-      x=="Moss Landing Marine Labs Aquaculture Center" ~ "Moss Landing Marine Laboratory - Aquaculture Center",
-      grepl(paste(c('Giant Giant Kelp','g2kr','giant giant kelp','G2KR','Great Great Kelp',
-                    'UrchinsKelpOtters',"Giant Kelp Project","Giant Giant Kelp Restoration Project",
-                    "Giant Giant Kelp Restoration Project (G2KR)",
-                    "Giant kelp restoration project - g2kr",
-                    "Great Great Kelp Restoration"),collapse="|"), x) ~ "Giant Giant Kelp Forest Restoration Project",
-      grepl(paste(c('UCSC','UC Santa Cruz'),collapse="|"), x) ~ "University of California Santa Cruz",
-      grepl(paste(c('CA Santa Barbara','California, Santa Barbara',"UC Santa Barbara"),collapse="|"),x) ~ "University of California Santa Barbara",
-      grepl(paste(c("Bodega marine labs","Bodega Marine Laboratory"),collapse="|"), x) ~ "University of California Davis - Bodega Marine Laboratory",
-      grepl(paste(c('UC Davis','Uc Davis','Uc davis','California Davis','California, Davis'),collapse="|"), x) ~ "University of California Davis",
-      grepl(paste(c('UC Berkeley','UCB','Uc berkeley'),collapse="|"), x) ~ "University of California Berkeley",
-      grepl('U.S. Geological Survey', x) ~ "US Geological Survey",
-      grepl(paste(c('CDFW','CALIFORNIA DEPARTMENT OF FISH AND WILDLIFE', 
-                    'CA Dept of Fish and Wildlife',
-                    'California Department of Fish and Wildlife (working with opc as our contractee)',
-                    'Fish and Wildlife'),collapse="|"), x) ~ "California Department of Fish and Wildlife",
-      grepl('Sea Urchin Commission', x) ~ "California Sea Urchin Commission",
-      grepl(paste(c('Earth equty', 'Earth equity'),collapse="|"), x) ~ "Earth Equity",
-      grepl('Cal Poly Pomona', x) ~ "California State Polytechnic University Pomona",
-      grepl('USFWS', x) ~ "US Fish and Wildlife Service",
-      grepl(paste(c('CA Ocean Protection Council','California Ocean Protection Council','Calif Ocean Protection Council'),collapse='|'),x) ~ 'California Ocean Protection Council',
-      x=='California Ocean Protection Council (contracted by them)' ~ 'California Ocean Protection Council',
-      x=='UC San Diego' ~ "University of California San Diego", 
-      grepl(paste(c("Watermens Alliance","Watermans Alliance","Waterman's Alliance"),collapse="|"), x) ~ "Watermen's Alliance",
-      grepl(paste(c("GFNMS Advisory Council","Greater Farralones"),collapse="|"), x) ~ 'Greater Farallones National Marine Sanctuary',
-      x=="Ocean Rainforest Inc" ~ 'Ocean Rainforest',
-      x=="Coastal Stewardship Task Force, The Sea Ranch Association" ~ "The Sea Ranch Association: Coastal Stewardship Task Force",
-      grepl(paste(c("Nature Conservancy","TNC","The Nature Conservancy CA"),collapse='|'),x) ~ "The Nature Conservancy",
-      x=="Vantuna Research Group at Occidental College" ~ "Occidental College - Vantuna Research Group",
-      x=="Sherwood Valley Rancheria" ~ "Sherwood Valley Band of Pomo Indians",
-      x=="Fish Reef Project (fishreef.org)"~"Fish Reef Project",
-      x=="The Greater Farallones Association" ~ "Greater Farallones Association",
-      grepl(paste(c("KRMP","KRMP community workgroup (CA DFW)"),collapse='|'),x) ~ "Kelp Restoration and Management Plan Community Working Group",
-      x=="CDFW Red Abalone Recovery Working Group" ~ "Red Abalone Recovery Working Group",
-      x=="Monterey Surfrider Chapter" ~ "Surfrider Foundation - Surfrider Monterey",
-      x=="Humboldt Surfrider Foundation Humboldt Chapter" ~ "Surfrider Foundation - Surfrider Humboldt",
-      x=="MPA Long Term Monitoring Program" ~ "California MPA Monitoring Program",
-      x=="WaveWalker Charters" ~ "Wave Walker Charters",
-      x=="West Coast Region, Office of National Marine Sanctuaries" ~ "National Oceanic and Atmospheric Administration - Office of National Marine Sanctuaries - West Coast Region",
-      grepl(paste(c("CA Sea Grant","CA Seagrant"),collapse='|'),x) ~ "California Sea Grant",
-      grepl("PISCO",x) ~ "Partnership for Interdisciplinary Studies of Coastal Oceans",
-      x=="The Kelp Forest Alliance" ~ "Kelp Forest Alliance",
-      x=="SBC LTER" ~ "University of California Santa Barbara - SBC LTER",
-      x=="MBNMS" ~ "Monterey Bay National Marine Sanctuary",
-      x=="Scripps Institution of Oceanography" ~ "University of California San Diego - Scripps Institution of Oceanography",
-      x=="Birch Aquarium" ~  "University of California San Diego - Scripps Institution of Oceanography - Birch Aquarium",
-      x=="Monterey Abalone Co." ~ "Monterey Abalone Company",
-      x=="Bamboo Reef Scuba Diving Centers" ~ "Bamboo Reef Scuba Diving Centers - Triton Spearfishing",
-      x=='Urchin removal diver' ~ NA,
-      x=="Stanford University (past)" ~ NA,
-      x=="co-PI Santa Barbara Coastal LTER site" ~ "University of California Santa Barbara - SBC LTER",
-      x=="PI - Seaweed CDR Project at UCSB" ~ "University of California Santa Barbara - Seaweed CDR Project",
-      x=="Stillwater Cove urchin divers" ~ "Stillwater Cove urchin divers",
-      grepl(paste(c("Volunteer Diving groups","North Coast KelpFest!","Independent filmmaking","x",
-                    "Triton Spearfishing",  # merged with _2
-                    "ANCKR", # merged with _1
-                    "CPC"    # name?
-      ),collapse='|'),x) ~ NA, 
-      x=="Greater Farallones and Cordell Bank National Marine Sanctuaries" ~ "Greater Farallones National Marine Sanctuary, Cordell Bank National Marine Sanctuary",
-      TRUE ~ x
-    ))
-}
-#
-
 
 
 # Data --------------------------------------------------------------------
@@ -113,19 +33,136 @@ dat_survey <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv'))
 
 colnames(dat_survey)
 
-## this is the cleaned up social network
-sn <- read_csv(here('confidential_data', 'processed', 'cleaned_social_network_with_org_2025-03-14.csv'))
+## this is the cleaned up data on organizations that people work on behalf of
+q3 <- read_csv(here('data','sen',paste0('processed_by_responseID_orgs_4sen_2025-07-09.csv')))
 
-
-## FOR FIRST PASS 3/17/2025:
-##   this is the cleaned up data set on the answer to the question: What are the main ways you learn about kelp forest-related issues?
-info <- read_csv(here('confidential_data', 'processed','cleaned_responseID_by_info_source_q9.csv'))
+## this is the cleaned up data on organizationst that people work directly with
+q11 <- read_csv(here('confidential_data','processed',paste0('processed_by_responseID_q11_collabs_4sen_2025-07-14.csv')))
 
 ## helpful Qs in the survey data
-qs_of_interest <- make_clean_names(c('ResponseId','Status',"RecipientLastName","RecipientFirstName",
-                                     "Q3 Individual_1",
-                                     colnames(dat_survey)[grepl('Q4',colnames(dat_survey))],
-                                     colnames(dat_survey)[grepl('Q9',colnames(dat_survey))]))
+qs_of_interest <- make_clean_names(c('response_id','status',"recipient_last_name","recipient_first_name",
+                                     "q3_individual_1",
+                                     colnames(dat_survey)[grepl('q4',colnames(dat_survey))],
+                                     colnames(dat_survey)[grepl('q9',colnames(dat_survey))]))
+
+## combine q3 and q11 by response ID
+head(q3)
+head(q11)
+
+orgdat <- q3 %>% select(-org_name,-multi_org) %>%   ## this is either q3_individual_1 or q3_several_1
+  pivot_longer(cols=starts_with('q3'), names_to='ego_level',values_to='ego') %>%
+  filter(!is.na(ego)) %>%
+  left_join(q11, by='response_id')  ## we want each ego to be matched with every alter so we can compare all pairs.
+
+## empty df for tracking sample sizes
+qc_df <- data.frame(q3=as.character(),
+                    category=as.character(),
+                    n_alters=as.character(),
+                    rc_or_g2kr=as.numeric(),
+                    n=as.numeric())
+
+
+# INDIVIDUAL: Reef Check or G2KR ------------------------------------------
+View( filter(orgdat, grepl('Individual',ego)) )
+
+orgdat0 <- orgdat %>% filter(grepl('Individual',ego) & ego_level=="q3_individual_1")
+orgdat0_n <- length(unique(orgdat0$response_id))
+
+orgdat0 %<>% select(response_id) %>% distinct() %>% left_join(orgdat)
+
+## filter for only volunteer / cit sci 
+filtdat0 <- orgdat0 %>%
+  mutate(rc_or_g2kr=ifelse(alter %in% c("Reef Check","Giant Giant Kelp Restoration Project"), 1, 0)) %>%
+  group_by(response_id) %>%
+  summarise(rc_or_g2kr=sum(rc_or_g2kr), n_alter=length(unique(alter))) %>%
+  mutate(q3='none',
+         category='vol or citsci') 
+
+## create corrected data frame
+tofix <- filtdat0 %>% filter(rc_or_g2kr > 0, n_alter > 1) %>%  ## all n_alter > 1 when rc_or_g2kr > 0
+  select(response_id) %>% left_join(orgdat0)
+tofix
+
+update <- tofix %>%
+  filter(type=='q11_1') %>%
+  select(response_id, alter) %>%
+  rename(ego=alter) %>% 
+  left_join(tofix %>% filter(type != 'q11_1') %>% select(-ego))
+
+
+## update the data frame for individuals involved on behalf of one organization
+orgdat0 %<>% anti_join(tofix) %>%
+  bind_rows(update)
+
+## check
+orgdat0
+
+## record sample sizes for QC
+qc_df %<>% bind_rows(
+  filtdat0 %>% mutate(n_alters=ifelse(n_alter > 1, "2-plus","1")) %>%
+    group_by(q3, category, rc_or_g2kr,n_alters) %>%
+    summarise(n=length(unique(response_id)))
+)
+
+# ONE ORG: Exact Ego-Alter match ----------------------------------
+orgdat1 <- filter(orgdat, ego_level=='q3_individual_1')
+orgdat1_n <- length(unique(orgdat1$response_id))
+
+## exact matches
+View(orgdat1 %>% filter(ego==alter))
+
+## filter for exact matches
+filtdat1 <- orgdat1 %>% filter(ego==alter) %>%
+  group_by(response_id) %>%
+  summarise(rc_or_g2kr=ifelse(ego %in% c("Reef Check","Giant Giant Kelp Restoration Project"), 1, 0)) %>%
+  left_join(orgdat, by='response_id') %>%
+  group_by(response_id, rc_or_g2kr) %>%
+  summarise(n_alter=length(unique(alter))) %>%
+  mutate(q3='one',
+         category='exact match') 
+
+
+## create corrected data frame
+tofix <- filtdat1 %>% filter(n_alter > 1) %>%
+  select(response_id) %>% left_join(orgdat1)
+
+update <- filter(tofix, ego!=alter)
+
+
+## update the data frame for individuals involved on behalf of one organization
+orgdat1 %<>% anti_join(tofix) %>%
+  bind_rows(update)
+
+## check
+orgdat1 %>% filter(ego==alter) %>%
+  group_by(response_id) %>% summarise(n_alter=length(unique(alter)))
+
+## record sample sizes for QC
+qc_df %<>% bind_rows(
+  filtdat1 %>% mutate(n_alters=ifelse(n_alter > 1, "2-plus","1")) %>%
+    group_by(q3, category, rc_or_g2kr,n_alters) %>%
+      summarise(n=length(unique(response_id)))
+)
+  
+View(filtdat1 %>% filter(n_alter > 1) %>% left_join(orgdat1))
+
+
+
+# 2+ ORGS: Exact Ego-Alter Match ------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

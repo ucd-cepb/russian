@@ -3,9 +3,9 @@
 # Adjust the names of alter organizations.
 #   
 #
-# For now, this script only completes this process for individuals
-#   who responded to QUESTION 9 (info source) by saying that they 
-#   directly observed kelp. *AND* only looks at collaborative ties.
+# For now, this script only looks at collaborative ties -
+#  q11: In the past year, which organizations and individual operators have you 
+#  **worked directly with** on kelp forest-related projects or programs?
 #
 # Mary Fisher
 #
@@ -42,9 +42,8 @@ question_11 <- dat_survey %>%
 question_11 %<>% filter(!is.na(org_name))
 
 
-# Adjust organization names -----------------------------------------------
-
-## use custom R function to adjust the names of organizations.
+# Build Function clean_org_names ------------------------------------------
+## create custom R function to adjust the names of organizations.
 
 question_11 %<>% mutate(clean_org_name=clean_org_names(org_name, collab=TRUE))
 
@@ -54,19 +53,106 @@ View(filter(question_11, is.na(clean_org_name)))
 ## check answers that didn't change
 View(filter(question_11, org_name==clean_org_name))
 ## to change round 1...
-# UCSB (Ospina, J. Smith)
-# SAFE
-# none
-# UCLA; Kyle Cavanuagh
-# 	
-# UC Davis (Baskett et al)
-# Dandy Fish Company (fish processor)
-# Morgan and Ian (North Coast Reef Check)
+# UCSB (Ospina, J. Smith) +
+# SAFE +
+# none +
+# UCLA; Kyle Cavanuagh +
+# UC Davis (Baskett et al) +
+# Dandy Fish Company (fish processor) +
+# Morgan and Ian (North Coast Reef Check) +
 # Opc SeaGrant cdfw + KRMP
-# Many many others
-# And many others..
-# Trinidad Rancheria
+# Many many others +
+# And many others.. +
 # CCCoP
-# Greater Farallones Association kelp team (Rietta Hohman)
-# SJSU Moss Landing Marine Labs - Scott Hamiltom
-# Office of Habitat Conservation - Natalie C-Manning and Julia Royster
+# Greater Farallones Association kelp team (Rietta Hohman) +
+# SJSU Moss Landing Marine Labs - Scott Hamiltom +
+# Office of Habitat Conservation - Natalie C-Manning and Julia Royster +
+
+question_11 %<>% mutate(clean_org_name=clean_org_names(org_name, collab=TRUE))
+
+## make decisions on "NA" answers. 
+View(filter(question_11, is.na(clean_org_name)))
+
+## check answers that didn't change
+View(filter(question_11, org_name==clean_org_name))
+#The Giant Giant Kelp restoration project
+#	Other credible kelp scientists
+#kelp farmers
+#Ocean Protection Council; Greater Farallones Assoc.
+
+
+question_11 %<>% mutate(clean_org_name=clean_org_names(org_name, collab=TRUE))
+
+## make decisions on "NA" answers. 
+View(filter(question_11, is.na(clean_org_name)))
+
+## check answers that didn't change
+View(filter(question_11, org_name==clean_org_name))
+#The Giant Giant Kelp restoration project
+#	Other credible kelp scientists
+#kelp farmers
+#Ocean Protection Council; Greater Farallones Assoc.
+#	Commercial Divers
+# Recreational Divers
+
+
+# Use Function clean_org_names to Adjust organization names ---------------
+question_11 %<>% mutate(clean_org_name=clean_org_names(org_name, collab=TRUE))
+## check output
+filter(question_11, is.na(clean_org_name))
+length(unique(question_11$org_name)); length(unique(question_11$clean_org_name))
+sum(grepl("-",question_11$clean_org_name))  # how many have project/group names included?
+sum(grepl(":",question_11$clean_org_name))  # how many have individual names included?
+sum(grepl(",",question_11$clean_org_name))  # how many do we have to split into multiple rows? *(next section)* -- ten!
+
+# Split multiple orgs -----------------------------------------------------
+## where collaboratives were named (e.g., PISCO, DISES) or where someone listed multiple orgs or 
+##   individuals in the same response, the clean_org_names function will separate the 
+##   separate org entries by a comma
+
+q11 <- question_11 %>%
+  select(-org_name) %>% rename(org_name=clean_org_name)
+
+q11 %<>% separate(org_name, into=c('org_name','org.2','org.3','org.4','org.5','org.6','org.7','org.8','org.9','org.10'),sep=",")
+
+## check cases where we have separate org entries
+View(q11 %>% filter(!is.na(org.2)))
+
+
+## make new rows for each of these. carry over the org level. 
+q11 %<>% filter(is.na(org.2)) %>%
+  select(-starts_with('org.')) %>%
+  bind_rows(
+    q11 %>% filter(!is.na(org.2)) %>%
+      pivot_longer(c('org_name',starts_with('org.')), names_to='tmp', values_to='tmp_org_name') %>%
+      mutate(org_name=ifelse(!is.na(tmp_org_name), tmp_org_name,NA)) %>%
+      select(-tmp,-tmp_org_name) %>% filter(!is.na(org_name))
+  )
+
+
+## remove NAs (from running the clean_org_names function)
+q11 %<>% filter(!is.na(org_name))
+
+
+
+# Save --------------------------------------------------------------------
+
+## rename column headers
+q11 %<>% rename(type=org_level)
+q11 %<>% rename(alter=org_name)
+
+## confidential version
+q11 %>% 
+  write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q11_collabs_4sen_',Sys.Date(),'.csv')))
+
+## non-confidential version
+q11 %>% 
+  select(response_id,type,alter) %>%
+  write_csv(here('data','sen',paste0('processed_by_responseID_q11_collabs_4sen_',Sys.Date(),'.csv')))
+
+
+
+
+
+
+

@@ -2,7 +2,9 @@
 #'
 #' The survey asked who respondents collaborated with. This function
 #' takes answers that include an umbrella institution like PISCO or DISES
-#' and expands to include all participating organizations.
+#' and expands to include all participating organizations. It is
+#' intended to run within the function clean_org_names.
+#' Formatting for organizations:
 #' {Primary Organization} - {Subgroup / Project}: {Individual}
 #' 
 #' Last updated: 7/3/2025
@@ -31,8 +33,15 @@ expand_org_names <- function() {
   dises_to_add <- filter(data, grepl("Kelp Restoration as an Integrated Socio-Ecological System", org_name)) %>%
     select(response_id)
   
-  dises_to_add %<>% mutate(new_org='Cal Poly Humboldt') %>%
-    bind_rows(dises_to_add %>% mutate(new_org='UC Santa Cruz'))
+  dises_to_add %<>% mutate(new_org='University of California Davis - Kelp Restoration as an Integrated Socio-Ecological System') %>%
+    bind_rows(dises_to_add %>% mutate(new_org='University of California Davis: Marissa Baskett')) %>%
+    bind_rows(dises_to_add %>% mutate(new_org='University of California Davis: Tyler Scott')) %>%
+    bind_rows(dises_to_add %>% mutate(new_org='University of California Davis: Mike Springborn')) %>%
+    bind_rows(dises_to_add %>% mutate(new_org='University of California Davis: John Largier')) %>%
+    bind_rows(dises_to_add %>% mutate(new_org='University of California Santa Cruz: Mark Carr')) %>%
+    bind_rows(dises_to_add %>% mutate(new_org='University of California Santa Cruz: Carrie Pomeroy'))%>%
+    bind_rows(dises_to_add %>% mutate(new_org='California State Polytechnic University Humboldt: Sean Craig'))%>%
+    bind_rows(dises_to_add %>% mutate(new_org='California State Polytechnic University Humboldt: Laurie Richmond'))
   
   ###################################
   
@@ -45,4 +54,16 @@ expand_org_names <- function() {
   
   #######################################
   out <- data %>% bind_rows(dises_to_add,pisco_to_add) %>% select(response_id,new_org)
+}
+
+expand_org_names_sub <- function(x){
+  if(x=="Opc SeaGrant cdfw + KRMP"){
+    return("Ocean Protection Council,California Sea Grant,California Department of Fish and Wildlife - Kelp Restoration and Management Plan")
+  } else if(x=='PISCO'){
+    return("Partnership for Interdisciplinary Studies of Coastal Oceans,Oregon State University,Stanford University - Hopkins Marine Station,University of California Santa Barbara,University of California Santa Cruz")
+  } else if(x=='Kelp Restoration as an Integrated Socio-Ecological System'){
+    return('University of California Davis - Kelp Restoration as an Integrated Socio-Ecological System,University of California Davis: Marissa Baskett,University of California Davis: Tyler Scott,University of California Davis: Mike Springborn,University of California Davis: John Largier,University of California Santa Cruz: Carrie Pomeroy,University of California Santa Cruz: Mark Carr,California State Polytechnic University Humboldt: Sean Craig,California State Polytechnic University Humboldt: Laurie Richmond')
+  } else if(x=='Ocean Protection Council; Greater Farallones Assoc.'){
+    return("Ocean Protection Council,Greater Farallones Association")
+  }
 }
