@@ -6,7 +6,7 @@
 # For "rules" on how this is done, check file: doc >> METHODS_survey_data_processing.docx
 #
 # To make my life easier, for individuals who work on behalf of two or more organizations,
-#   I only cleaned up data for those I counted as 
+#   I only cleaned up data for those who directly observe conditions.
 #
 # Mary Fisher
 #
@@ -37,7 +37,7 @@ dat_survey <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv'))
 colnames(dat_survey)
 
 ## this is the cleaned up data on organizations that people work on behalf of
-q3 <- read_csv(here('data','sen',paste0('processed_by_responseID_orgs_4sen_2025-07-09.csv')))
+q3 <- read_csv(here('data','sen',paste0('processed_by_responseID_orgs_4sen_2025-07-17.csv')))
 
 ## this is the cleaned up data on organizationst that people work directly with
 q11 <- read_csv(here('confidential_data','processed',paste0('processed_by_responseID_q11_collabs_4sen_2025-07-14.csv')))
@@ -54,9 +54,9 @@ head(q11)
 
 ## save!!
 q3q11 <- q3 %>% left_join(q11, by='response_id')
-write_csv(orgdat_out, here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_4sen_',Sys.Date(),'.csv')))
+write_csv(q3q11, here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_4sen_',Sys.Date(),'.csv')))
 
-## reformat. ## we want each ego to be matched with every alter so we can compare all pairs.
+## reformat. we want each ego to be matched with every alter so we can compare all pairs.
 orgdat <- q3q11 %>% select(-org_name,-multi_org) %>%   ## this is either q3_individual_1 or q3_several_1
   pivot_longer(cols=starts_with('q3'), names_to='ego_level',values_to='ego') %>%  
   filter(!is.na(ego))
@@ -113,24 +113,24 @@ qc_df %<>% bind_rows(
 
 # Save VERSION: Changes to here -------------------------------------------
 
-## this is for when we assign individuals to administrative areas. Egos are changed only for respondents
-##    who work as an individual
+# this is for when we assign individuals to administrative areas. Egos are changed only for respondents
+#    who work as an individual
 # q3q11 %>%
 #   filter(!(response_id %in% orgdat0$response_id)) %>%
 #   bind_rows(orgdat0 %>%
 #               pivot_wider(names_from='ego_level',values_from='ego') %>%
 #               mutate(org_name=q3_individual_1,multi_org=NA)) %>%
-# write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen',Sys.Date(),'.csv')))
-
-
-
+# write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',Sys.Date(),'.csv')))
+# 
+# 
+# 
 # q3q11 %>%
 #   filter(!(response_id %in% orgdat0$response_id)) %>%
 #   bind_rows(orgdat0 %>%
 #               pivot_wider(names_from='ego_level',values_from='ego') %>%
 #               mutate(org_name=q3_individual_1,multi_org=NA)) %>%
 #   select(response_id, org_name, starts_with('q3'), multi_org, type, alter) %>%
-#   write_csv(here('data','sen',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen',Sys.Date(),'.csv')))
+#   write_csv(here('data','sen',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',Sys.Date(),'.csv')))
 
 
 
@@ -152,7 +152,7 @@ filtdat1 <- orgdat1 %>% filter(ego==alter) %>%
          category='exact match') 
 
 
-## create corrected data frame
+## create corrected data frame, only for those who have an alter other than the one that matches their ego org
 tofix <- filtdat1 %>% filter(n_alter > 1) %>%
   select(response_id) %>% left_join(orgdat1)
 
@@ -165,7 +165,7 @@ orgdat1 %<>% anti_join(tofix) %>%
 
 ## check
 orgdat1 %>% filter(ego==alter) %>%
-  group_by(response_id) %>% summarise(n_alter=length(unique(alter)))
+  group_by(response_id) %>% summarise(n_alter=length(unique(alter)))  # all n_alter should = 1
 
 ## record sample sizes for QC
 qc_df %<>% bind_rows(
@@ -173,13 +173,13 @@ qc_df %<>% bind_rows(
     group_by(q3, category, rc_or_g2kr,n_alters) %>%
       summarise(n=length(unique(response_id)))
 )
-  
+## check new assignments
 View(filtdat1 %>% filter(n_alter > 1) %>% left_join(orgdat1))
 
 # Save VERSION: Changes to here -------------------------------------------
 
-## this is for when we assign individuals to administrative areas. Egos are changed only for respondents
-##    who work as an individual
+# this is for when we assign individuals to administrative areas. Egos are changed only for respondents
+#    who work as an individual
 # q3q11 %>%
 #   filter(!(response_id %in% orgdat0$response_id)) %>%
 #   filter(!(response_id %in% orgdat1$response_id)) %>%
@@ -189,7 +189,7 @@ View(filtdat1 %>% filter(n_alter > 1) %>% left_join(orgdat1))
 #   bind_rows(orgdat1 %>%
 #               pivot_wider(names_from='ego_level',values_from='ego') %>%
 #               mutate(org_name=q3_individual_1,multi_org=NA)) %>%
-#   write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen',Sys.Date(),'.csv')))
+#   write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen_',Sys.Date(),'.csv')))
 
 
 # q3q11 %>%
@@ -201,13 +201,16 @@ View(filtdat1 %>% filter(n_alter > 1) %>% left_join(orgdat1))
 #   bind_rows(orgdat1 %>%
 #               pivot_wider(names_from='ego_level',values_from='ego') %>%
 #               mutate(org_name=q3_individual_1,multi_org=NA)) %>%
-#   write_csv(here('../california-kelp-SEN','data','survey','confidential',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen',Sys.Date(),'.csv')))
+#   write_csv(here('../california-kelp-SEN','data','survey','confidential',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen_',Sys.Date(),'.csv')))
 
+
+#################################### stopped here 7/17 ####################################
 # 2+ ORGS: Exact Ego-Alter Match ------------------------------------------
 
+## grab respondents who work on behalf of multiple orgs
 orgdat2 <- filter(orgdat, ego_level=='q3_several_1') %>%
   select(response_id) %>% distinct() %>% left_join(orgdat)
-orgdat2_n <- length(unique(orgdat2$response_id))
+orgdat2_n <- length(unique(orgdat2$response_id))  # 63
 
 ## exact matches
 View(orgdat2 %>% filter(ego==alter) %>% 
@@ -225,13 +228,15 @@ filtdat2 <- orgdat2 %>% filter(ego==alter) %>%
             n_ego=length(unique(ego))) %>%
   mutate(q3='two') 
 with(filtdat2, table(category))
-  
+# exact-first ego exact-other ego 
+# 17              23
+#   
 
-## remove alter -- first ego listed is also an exact match for an alter
+## remove alter IF first ego listed is also an exact match for an alter
 tofix_alter <- filter(filtdat2, category=='exact-first ego') %>%
   select(response_id) %>% distinct() %>% left_join(orgdat2)
 
-## remove ego -- second or later ego listed is also an exact match for an alter
+## remove ego IF second or later ego listed is also an exact match for an alter
 tofix_ego <- filter(filtdat2, category=='exact-other ego') %>%
   select(response_id) %>% distinct() %>% left_join(orgdat2)
 
@@ -293,7 +298,16 @@ update_both <- filter(tofix_both, response_id=='R_1AGjFLTVbTA4HTj') %>%
 write_csv(here('_updateINDfilterALTERfilterEGO'))
 
 
-# Identify & Remove affiliations that are collaborations -----------------------------
+
+
+
+
+
+
+
+
+
+# Retired code ------------------------------------------------------------
 
 ## there seems to be quite a lot of overlap between "work on behalf of" and "collaborate with."
 ## for people who said that they work on behalf of multiple organizations, check to see if any 
