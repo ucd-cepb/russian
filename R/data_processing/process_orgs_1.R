@@ -253,13 +253,13 @@ ucsb <- q3_clean %>%
 ## add respondent names & corrected org names from sn2 (above)
 ucsb_new <- ucsb %>%
   mutate(q3_individual_1=case_when(
-    response_id=='R_5dnbJSY7qhuMdsB' ~ paste0(q3_individual_1, '- MPA'),
-    response_id=='R_6mwVifciTCq64Hs' ~ paste0(q3_individual_1, '- SONGS & MPA'),
+    response_id=='R_5dnbJSY7qhuMdsB' ~ paste0(q3_individual_1, ' - MPA'),
+    response_id=='R_6mwVifciTCq64Hs' ~ paste0(q3_individual_1, ' - SONGS & SBC LTER'),
     .default=q3_individual_1
   ),
   q3_several_1=case_when(
-    response_id=='R_59T9thuNU6T04lX' ~ paste0(q3_several_1, '- SONGS'),
-    response_id=='R_1MEiTDdy7UTusoz' ~ paste0(q3_several_1, '- MPA'),
+    response_id=='R_59T9thuNU6T04lX' ~ paste0(q3_several_1, ' - SONGS'),
+    response_id=='R_1MEiTDdy7UTusoz' ~ paste0(q3_several_1, ' - MPA'),
     .default=q3_several_1
   ))
   
@@ -289,7 +289,7 @@ View(dat_survey %>% filter(response_id=='R_1gumT7uft6SpkJY'))
 humboldt_new <- humboldt %>% 
   filter(!response_id %in% c('R_1OwaKPJzCpBm5QR','R_1PTOVqgZmThkEyB','R_3RSD7GUxRnXMGbL')) %>%
   mutate(q3_individual_1=case_when(
-    response_id %in% c('R_3uHTLrh3ea49nmF','R_1gumT7uft6SpkJY') ~ "California State Polytechnic University Humboldt - Aquaculture",
+    response_id %in% c('R_3uHTLrh3ea49nmF','R_1gumT7uft6SpkJY') ~ "California State Polytechnic University Humboldt - Kelp Culture",
   .default=q3_individual_1),
   q3_several_1=case_when(
     response_id =='R_1LY9bZGoDJpKr8U' ~ "California State Polytechnic University Humboldt - North coast Evaluation of Reef Ecosystems Organization",
@@ -307,7 +307,7 @@ View(otters)
 
 otters_new <- otters %>% mutate(q3_individual_1=case_when(
   response_id=='R_3H4Mz7SlkUD54nD'~'California Department of Fish and Wildlife - Sea Otter Census',
-  response_id=='R_71ZSMnpmiNQkwhl'~'US Geological Survey - Western Ecological Research Center'
+  response_id=='R_71ZSMnpmiNQkwhl'~'US Geological Survey - Western Ecological Research Center' #note this individual also involved in dive surveys at SNI; same research center in data files
 ))
 
 q3_clean %<>% filter(!(response_id %in% otters_new$response_id)) %>%
