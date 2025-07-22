@@ -6,7 +6,7 @@
 #' of names is as follows:
 #' {Primary Organization} - {Subgroup / Project}: {Individual}
 #' 
-#' Last updated: 7/3/2025
+#' Last updated: 7/21/2025
 #'
 #' @param data a vector of the names to clean
 #' @param collab true / false. TRUE: organization names represent a collaboration / coordination / communication tie. **this is important because individual names may be over written if FALSE is incorrectly chosen.
@@ -72,10 +72,13 @@ clean_org_names <- function(x, collab = FALSE, return_original = FALSE){
       x=="Ocean Rainforest Inc" ~ 'Ocean Rainforest',
       x=="Coastal Stewardship Task Force, The Sea Ranch Association" ~ "The Sea Ranch Association - Coastal Stewardship Task Force",
       grepl(paste(c("Nature Conservancy","TNC","The Nature Conservancy CA"),collapse='|'),x) ~ "The Nature Conservancy",
-      x=="Vantuna Research Group at Occidental College" ~ "Occidental College - Vantuna Research Group",
+      grepl("Vantuna Research Group",x) ~ "Occidental College - Vantuna Research Group",
       x=="Sherwood Valley Rancheria" ~ "Sherwood Valley Band of Pomo Indians",
       x=="Fish Reef Project (fishreef.org)"~"Fish Reef Project",
       x=="The Greater Farallones Association" ~ "Greater Farallones Association",
+     x %in% c("NOAA Channel Islands National Marine Sanctuary",
+              "Channel Islands National Park",
+              "NOAA CINMS" ) ~ "Channel Islands National Marine Sanctuary",
       x=="CDFW Red Abalone Recovery Working Group" ~ "Red Abalone Recovery Working Group",
       x=="Monterey Surfrider Chapter" ~ "Surfrider Foundation - Surfrider Monterey",
       x=="Humboldt Surfrider Foundation Humboldt Chapter" ~ "Surfrider Foundation - Surfrider Humboldt",

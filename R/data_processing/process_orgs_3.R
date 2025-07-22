@@ -37,7 +37,7 @@ dat_survey <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv'))
 colnames(dat_survey)
 
 ## this is the cleaned up data on organizations that people work on behalf of
-q3 <- read_csv(here('data','sen',paste0('processed_by_responseID_orgs_4sen_2025-07-18.csv')))
+q3 <- read_csv(here('data','sen',paste0('processed_by_responseID_orgs_4sen_2025-07-21.csv')))
 
 ## this is the cleaned up data on organizationst that people work directly with
 q11 <- read_csv(here('confidential_data','processed',paste0('processed_by_responseID_q11_collabs_4sen_2025-07-14.csv')))
@@ -115,22 +115,22 @@ qc_df %<>% bind_rows(
 
 # this is for when we assign individuals to administrative areas. Egos are changed only for respondents
 #    who work as an individual
-# q3q11 %>%
-#   filter(!(response_id %in% orgdat0$response_id)) %>%
-#   bind_rows(orgdat0 %>%
-#               pivot_wider(names_from='ego_level',values_from='ego') %>%
-#               mutate(org_name=q3_individual_1,multi_org=NA)) %>%
-# write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',Sys.Date(),'.csv')))
+q3q11 %>%
+  filter(!(response_id %in% orgdat0$response_id)) %>%
+  bind_rows(orgdat0 %>%
+              pivot_wider(names_from='ego_level',values_from='ego') %>%
+              mutate(org_name=q3_individual_1,multi_org=NA)) %>%
+write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',Sys.Date(),'.csv')))
+
 # 
 # 
-# 
-# q3q11 %>%
-#   filter(!(response_id %in% orgdat0$response_id)) %>%
-#   bind_rows(orgdat0 %>%
-#               pivot_wider(names_from='ego_level',values_from='ego') %>%
-#               mutate(org_name=q3_individual_1,multi_org=NA)) %>%
-#   select(response_id, org_name, starts_with('q3'), multi_org, type, alter) %>%
-#   write_csv(here('data','sen',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',Sys.Date(),'.csv')))
+q3q11 %>%
+  filter(!(response_id %in% orgdat0$response_id)) %>%
+  bind_rows(orgdat0 %>%
+              pivot_wider(names_from='ego_level',values_from='ego') %>%
+              mutate(org_name=q3_individual_1,multi_org=NA)) %>%
+  select(response_id, org_name, starts_with('q3'), multi_org, type, alter) %>%
+  write_csv(here('data','sen',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',Sys.Date(),'.csv')))
 
 
 
@@ -204,7 +204,7 @@ q3q11 %>%
   write_csv(here('../california-kelp-SEN','data','survey','confidential',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen_',Sys.Date(),'.csv')))
 
 
-#################################### stopped here 7/17 ####################################
+#################################### stopped here 7/21 ####################################
 # 2+ ORGS: Exact Ego-Alter Match ------------------------------------------
 
 ## grab respondents who work on behalf of multiple orgs
