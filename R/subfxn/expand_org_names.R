@@ -53,7 +53,17 @@ expand_org_names <- function() {
     bind_rows(pisco_to_add %>% mutate(new_org='University of California Santa Cruz'))
   
   #######################################
-  out <- data %>% bind_rows(dises_to_add,pisco_to_add) %>% select(response_id,new_org)
+  divers_to_add <- filter(data, org_name=="Recreational and Commercial Divers") %>% 
+    select(response_id)
+  divers_to_add %<>% mutate(new_org='Recreational Divers') %>%
+    bind_rows(divers_to_add %>% mutate(new_org='Commercial Divers'))
+  
+  divers_to_add2 <- filter(data, org_name=="California Sea Urchin Commission: Grant Downie") %>%
+    select(response_id)
+  divers_to_add2 %<>% mutate(new_org="California Sea Urchin Commission: Grant Downie") %>%
+    bind_rows(divers_to_add %>% mutate(new_org='Commercial Diver: Grant Downie'))
+  #######################################
+  out <- data %>% bind_rows(dises_to_add,pisco_to_add, divers_to_add) %>% select(response_id,new_org)
 }
 
 expand_org_names_sub <- function(x){
