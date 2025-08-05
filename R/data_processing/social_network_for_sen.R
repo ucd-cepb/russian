@@ -183,7 +183,6 @@ View(dat) ## search for "Jon" and "Carr"
 ## Revise organization names that don't match between alter / ego data.
 ## for the SEN, this includes org names that I made extra specific to help
 ## connect people to kelp administrative areas.
-dat_out <- dat
 
 all_egos <- unique(dat %>% dplyr::select(response_id,multi_org) %>%
                      separate(multi_org, into=c('org1','org2','org3','org4','org5','org6'), sep=',') %>% 
@@ -226,19 +225,61 @@ write_csv(all_orgs,here('data','sen','sn_match_ego_alter_organizations.csv'))
 # Create social network ---------------------------------------------------
 
 # First Pass: Data Res collabs only ------------------------------------
-## read in names key
+dat_out <- dat
 
+## read in names key
+key <- read_csv(here('data','sen','sn_match_ego_alter_organizations_KEY.csv'))
+head(key)
 
 ## apply re-naming to 'dat' dataframe.
+dat_out %<>% dplyr::select(-starts_with('q3')) %>%
+  separate(multi_org, into=c('org1','org2','org3','org4','org5','org6'), sep=',') %>%
+  dplyr::select(-org_name) %>% pivot_longer(starts_with('org'), names_to='org_level',values_to='org_name') %>%
+  filter(!is.na(org_name))
 
+dat_out %<>% dplyr::select(-alter_org) %>%
+  separate(alter,into=c('alter_org','alter_ind'),sep=':', remove=FALSE) %>%
+  mutate(alter_org=ifelse(alter_org %in% c('Commercial Diver','Artist','Photographer','Individual'), alter,alter_org))
+dat_out %<>% dplyr::select(-alter_ind)
+
+dat_out %<>% left_join(key, by=c('org_name')) %>%
+  left_join(key %>% rename(sn_alter=sn_org_name,sn_alter_scale=sn_org_scale,sn_alter_type=sn_org_type), by=c('alter_org'='org_name'))
+
+## missing? these are individuals.
+any(is.na(dat_out$sn_org_name))
+View(dat_out %>% filter(is.na(sn_org_name)))
+
+dat_out %<>% filter(!is.na(sn_org_name)) %>%
+  bind_rows(
+    dat_out %>% filter(is.na(sn_org_name)) %>%
+      mutate(sn_org_name=org_name,sn_org_scale='Individual',sn_org_type='Individual')
+    )
+
+## missing? nope!
+dat_out %>% filter(is.na(sn_alter) & !is.na(alter))
 
 ## save as data frame
+write_csv(dat_out, here('confidential_data','processed',paste0('sn_datares_STRICT_',Sys.Date(),'_4sen.csv')))
 
+dat_out %>% group_by(sn_org_name,sn_org_scale,sn_org_type,sn_alter,sn_alter_scale,sn_alter_type) %>%
+  summarise(r=length(unique(response_id))) %>%
+  write_csv(here('data','sen',paste0('sn_datares_STRICT_',Sys.Date(),'_4sen.csv')))
 
-## save as matrix
+## as matrix
+mat_out <- dat_out %>% filter(!is.na(sn_alter)) %>%
+  group_by(sn_org_name,sn_alter) %>%
+  summarise(r=length(unique(response_id))) %>%
+  #zeros v. missing data
+  pivot_wider(id_cols=sn_org_name,names_from=sn_alter,values_from=r) %>%
+  pivot_longer(cols=2:(length(unique(dat_out$sn_alter))),names_to='sn_alter',values_to='r') %>%
+  mutate(r=ifelse(is.na(r) & sn_alter %in% dat_out$sn_org_name,0,r)) %>%
+  pivot_wider(id_cols=sn_org_name,names_from=sn_alter,values_from=r) %>%
+  column_to_rownames('sn_org_name')
 
-#zeros v. missing data
+sum(mat_out==0,na.rm=TRUE)
 
+#save
+write_csv(mat_out, here('data','sen',paste0('sn_datares_STRICT_',Sys.Date(),'_matrix_4sen.csv')))
 
 # Second Pass: all collaborations -----------------------------------------
 
