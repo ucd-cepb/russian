@@ -227,13 +227,20 @@ write_csv(all_orgs,here('data','sen','sn_match_ego_alter_organizations.csv'))
 # First Pass: Data Res collabs only ------------------------------------
 dat_out <- dat
 
+######################### read in new key!!! Aug 12 ######################### 
+######################### ######################### ######################### 
 ## read in names key
 key <- read_csv(here('data','sen','sn_match_ego_alter_organizations_KEY.csv'))
 head(key)
 
-## apply re-naming to 'dat' dataframe.
+## apply re-naming to 'dat' dataframe. make sure we get all orgs for multi org respondents
 dat_out %<>% dplyr::select(-starts_with('q3')) %>%
   separate(multi_org, into=c('org1','org2','org3','org4','org5','org6'), sep=',') %>%
+  mutate(org1=ifelse(is.na(org1), org_name,org1))
+
+View(dat_out %>% filter(is.na(org1)))
+
+dat_out %<>% 
   dplyr::select(-org_name) %>% pivot_longer(starts_with('org'), names_to='org_level',values_to='org_name') %>%
   filter(!is.na(org_name))
 
@@ -245,14 +252,18 @@ dat_out %<>% dplyr::select(-alter_ind)
 dat_out %<>% left_join(key, by=c('org_name')) %>%
   left_join(key %>% rename(sn_alter=sn_org_name,sn_alter_scale=sn_org_scale,sn_alter_type=sn_org_type), by=c('alter_org'='org_name'))
 
-## missing? these are individuals.
+## missing? these are individuals *except* for the response
+##    who has individual only as the fourth org, and is affiliated with three other orgs.
 any(is.na(dat_out$sn_org_name))
 View(dat_out %>% filter(is.na(sn_org_name)))
 
-dat_out %<>% filter(!is.na(sn_org_name)) %>%
+dat_out %<>% 
+  filter(!is.na(sn_org_name)) %>% #
   bind_rows(
     dat_out %>% filter(is.na(sn_org_name)) %>%
-      mutate(sn_org_name=org_name,sn_org_scale='Individual',sn_org_type='Individual')
+      filter(response_id!='R_56D6mBrAXbvzaBX') %>% # skip this one
+      mutate(sn_org_name=paste0('Individual:',str_sub(response_id,-4))) %>%
+      mutate(sn_org_scale='Individual',sn_org_type=org_name)
     )
 
 ## missing? nope!
