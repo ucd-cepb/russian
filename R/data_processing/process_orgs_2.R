@@ -43,8 +43,8 @@ question_11 <- dat_survey %>%
 question_11 %<>% filter(!is.na(org_name))
 
 
-# Build Function clean_org_names ------------------------------------------
-## create custom R function to adjust the names of organizations.
+# clean_org_names: first run ------------------------------------------
+## use custom R function to adjust the names of organizations.
 
 question_11 %<>% mutate(clean_org_name=clean_org_names(org_name, collab=TRUE))
 
@@ -101,10 +101,13 @@ View(filter(question_11, org_name==clean_org_name))
 question_11 %<>% mutate(clean_org_name=clean_org_names(org_name, collab=TRUE))
 ## check output
 filter(question_11, is.na(clean_org_name))
+
+question_11 %<>% filter(!is.na(clean_org_name))
+
 length(unique(question_11$org_name)); length(unique(question_11$clean_org_name))
-sum(grepl("-",question_11$clean_org_name))  # how many have project/group names included?
-sum(grepl(":",question_11$clean_org_name))  # how many have individual names included?
-sum(grepl(",",question_11$clean_org_name))  # how many do we have to split into multiple rows? *(next section)* -- ten!
+sum(grepl("-",question_11$clean_org_name))  # how many have project/group names included? 54
+sum(grepl(":",question_11$clean_org_name))  # how many have individual names included? 173
+sum(grepl(",",question_11$clean_org_name))  # how many do we have to split into multiple rows? *(next section)* -- 9
 
 # Split multiple orgs -----------------------------------------------------
 ## where collaboratives were named (e.g., PISCO, DISES) or where someone listed multiple orgs or 

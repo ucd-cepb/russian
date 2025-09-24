@@ -1,6 +1,6 @@
 ############### Process survey data on ego organization ############### 
 #
-# Adjust survey responses to q3. People can work on kelp-related issues
+# Adjust survey responses to q3 (ego!). People can work on kelp-related issues
 #    as an individual, on behalf of one organization, or on behalf of 
 #    two or more organizations.
 #
@@ -33,11 +33,14 @@ dat_survey <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv'))
   clean_names() %>%
   slice(-c(1:2))
 
+dat_survey_complete <- filter(dat_survey, as.numeric(progress) > 75)
+dim(dat_survey); dim(dat_survey_complete)  # from 244 to 190
+
 ##   this is the cleaned up data set on the answer to the question: What are the main ways you learn about kelp forest-related issues?
 info <- read_csv(here('confidential_data', 'processed','cleaned_responseID_by_info_source_q9.csv'))
 
 ## these are the questions with org info
-question_3 <- dat_survey %>%
+question_3 <- dat_survey_complete %>%
   dplyr::select(response_id, recipient_last_name, recipient_first_name, email, starts_with('q3')) %>% 
   pivot_longer(starts_with('q3'), values_to='org_name',names_to='org_level')
 
@@ -97,9 +100,11 @@ question_3 %<>% filter(!is.na(org_name) & org_name != 'x')
 
 
 ## who did we lose? use this to iteritively adjust code above.
-lost_responses <- anti_join(dplyr::select(dat_survey, response_id, recipient_last_name, recipient_first_name, email,recipient_email,finished, 
+lost_responses <- anti_join(dplyr::select(dat_survey, response_id, recipient_last_name, recipient_first_name, email,recipient_email,finished,progress,
                                           starts_with('q3'), starts_with('q11')), question_3) %>%
   filter(is.na(recipient_last_name) | !(recipient_last_name %in% question_3$recipient_last_name))
+
+## no one over 75% completed with any org, location data.
 
 
 
@@ -113,17 +118,17 @@ question_3 %<>% mutate(clean_org_name=clean_org_names(org_name))
 ## make decisions on "NA" answers
 View(filter(question_3, is.na(clean_org_name)))
 
-q3 <- question_3 %>% mutate(clean_org_name=case_when(org_name=='Decline to state' ~ 'Individual', 
-                                                org_name=='Management of Ecosystems Across the Californias (MexCal)' ~ 'Management of Ecosystems Across the Californias (MexCal)',
-                                                .default=clean_org_name)) %>%
-  filter(response_id != 'R_1qyNTuTpApbsKrv') %>%
-  ## respondent listed "Individual" (2) and Reef Check (2). Make Reef Check (1)
-  bind_rows(
-    filter(question_3, response_id=='R_1qyNTuTpApbsKrv' & org_level=='q3_several_2') %>% 
-      mutate(org_level='q3_individual_1') 
-  )
+# q3 <- question_3 %>% mutate(clean_org_name=case_when(org_name=='Decline to state' ~ 'Individual', 
+#                                                 org_name=='Management of Ecosystems Across the Californias (MexCal)' ~ 'Management of Ecosystems Across the Californias (MexCal)',
+#                                                 .default=clean_org_name)) %>%
+#   filter(response_id != 'R_1qyNTuTpApbsKrv') %>%
+#   ## respondent listed "Individual" (2) and Reef Check (2). Make Reef Check (1)
+#   bind_rows(
+#     filter(question_3, response_id=='R_1qyNTuTpApbsKrv' & org_level=='q3_several_2') %>% 
+#       mutate(org_level='q3_individual_1') 
+#   )
 
-q3 %<>% filter(!is.na(clean_org_name))
+q3 <- question_3 %>% filter(!is.na(clean_org_name))
 
 ## re-format
 q3 %<>% select(-org_name) %>% rename(org_name=clean_org_name)
@@ -141,14 +146,14 @@ View(question_3 %>% select(clean_org_name) %>% distinct())
 q3_ind <- dat_survey %>%
   dplyr::select(response_id, recipient_last_name, recipient_first_name, email, starts_with('q2')) %>%
   filter(q2=='No, I am involved on my own' & !(response_id %in% q3$response_id))
-dim(q3_ind)
+dim(q3_ind)  ## 7
 
 
 q3 %<>% bind_rows(
 q3_ind %>% select(-q2) %>% mutate(q3_individual_1="Individual")
 )
 
-dim(q3) #191
+dim(q3) #191 for all answers; 173 for >75% complete
 
 # Save --------------------------------------------------------------------
 
@@ -157,7 +162,7 @@ q3 %>% select(response_id,starts_with('q3')) %>%
 
 
 
-
+################################## Direct observers ################################## 
 # Direct observers: Clean up Part 2 ---------------------------------------
 
 q3_clean <- q3
@@ -168,59 +173,62 @@ do <- unique(info %>%
                pull(response_id))
 
 ## how many are not in the existing data frame?
-length(which(!(do %in% q3$response_id))) # 0
+length(which(!(do %in% q3_clean$response_id))) # 1
+View(filter(dat_survey,response_id==do[which(!(do %in% q3_clean$response_id))])) ## 62% complete. Cal Poly Humboldt.
 
 ## exactly duplicated primary / secondary orgs for individuals involved on behalf of several organizations?
-any(q3$q3_several_1 == q3$q3_several_2)
-to_fix <- q3 %>% filter(q3_several_1 == q3_several_2)
+any(q3_clean$q3_several_1 == q3_clean$q3_several_2)
+to_fix <- q3_clean %>% filter(q3_several_1 == q3_several_2)
 View(filter(q3, response_id %in% to_fix$response_id))
 
 ## !! fix!
-q3_clean %<>% filter(!response_id %in% to_fix) %>%
+q3_clean %<>% filter(!response_id %in% to_fix$response_id) %>%
   bind_rows(
-    to_fix %>% mutate(q3_several_2=q3_several_1,
-                      q3_several_1=q3_several_3,
-                      q3_individual_1=NA) %>%
+    to_fix %>% filter(response_id != 'R_3REDy37W41gd9F7') %>%
+      mutate(q3_several_1=q3_several_2,
+             q3_several_2=q3_several_3,
+             q3_several_3=q3_several_4,
+             q3_several_4=NA)) %>% 
+  bind_rows(
+    to_fix %>% filter(response_id == 'R_3REDy37W41gd9F7') %>%
+      mutate(q3_several_2=q3_several_1,
+             q3_several_1=q3_several_3,
+             q3_individual_1=NA) %>%
       mutate(q3_several_3=NA)
   )
+View(filter(q3_clean, response_id %in% to_fix$response_id))
 
-
-## cases where individuals listed similar primary / secondary org?
+## cases where individuals listed similar primary / secondary org? ## just 1. 
 to_fix2 <- q3_clean %>% mutate(partial_match=str_detect(q3_several_1,q3_several_2)) %>%
   filter(partial_match=='TRUE')
-
-## check raw survey data
-View(dat_survey %>% filter(response_id %in% to_fix2$response_id))
-
-## for both of these, it's ok to keep the more specific answer only
+## keep the more specific answer only
 q3_clean %<>% mutate(q3_several_2=ifelse(response_id %in% to_fix2$response_id, NA, q3_several_2))
 
-## cases where individuals listed similar secondary / primary org?
+## cases where individuals listed similar secondary / primary org? inverse. ## just 1
 to_fix3 <- q3_clean %>% mutate(partial_match=str_detect(q3_several_2,q3_several_1)) %>%
   filter(partial_match=='TRUE')
-## leave this in, scripps as separate from birch aquarium
+## leave this in, advisory council separate from GFA
 
-## cases where individuals listed similar primary / tertiary org?
+## cases where individuals listed similar primary / tertiary org? # none
 to_fix4 <- q3_clean %>% mutate(partial_match1=str_detect(q3_several_1,q3_several_3),
                                partial_match2=str_detect(q3_several_3,q3_several_1)) %>%
   mutate(partial_match=ifelse(partial_match1==TRUE | partial_match2==TRUE, TRUE, FALSE)) %>%
   select(-partial_match1,-partial_match2) %>%
   filter(partial_match=='TRUE') ## none!
 
-## cases where individuals listed similar primary / fourth org?
+## cases where individuals listed similar primary / fourth org? # one
 to_fix4 <- q3_clean %>% mutate(partial_match1=str_detect(q3_several_1,q3_several_4),
                                partial_match2=str_detect(q3_several_4,q3_several_1)) %>%
   mutate(partial_match=ifelse(partial_match1==TRUE | partial_match2==TRUE, TRUE, FALSE)) %>%
   select(-partial_match1,-partial_match2) %>%
   filter(partial_match=='TRUE') 
-#one! Make more specific answer (fourth org) the primary answer.
-## !! fix!
-q3_clean %<>% filter(!response_id %in% to_fix4) %>%
-  bind_rows(
-    to_fix4 %>% mutate(q3_several_1=q3_several_4,
-                      q3_several_4=q3_several_5) %>%
-      mutate(q3_several_5=NA)
-  )
+# Leave as-is. MLML works on water, whereas to date (Sep 2025) sunflower star lab does not
+# q3_clean %<>% filter(!response_id %in% to_fix4) %>%
+#   bind_rows(
+#     to_fix4 %>% mutate(q3_several_1=q3_several_4,
+#                       q3_several_4=q3_several_5) %>%
+#       mutate(q3_several_5=NA)
+#   )
 
 ## cases where individuals listed similar secondary / tertiary org?
 to_fix5 <- q3_clean %>% mutate(partial_match1=str_detect(q3_several_2,q3_several_3),
@@ -315,46 +323,117 @@ q3_clean %<>% filter(!(response_id %in% otters_new$response_id)) %>%
 
 rm(otters_new)
 
+
+
+
+################################## All other respondents ################################## 
+
+# All other: Clean up Part 2b ---------------------------------------
+## grab individuals who do not directly observe conditions
+q3_othr <- q3 %>% filter(!(response_id %in% do))
+dim(q3_othr)  ## 42
+
+## exactly duplicated primary / secondary orgs for individuals involved on behalf of several organizations?
+any(q3_othr$q3_several_1 == q3_othr$q3_several_2, na.rm=TRUE)
+
+## cases where individuals listed similar primary / secondary org?
+to_fix2 <- q3_othr %>% mutate(partial_match=str_detect(q3_several_1,q3_several_2)) %>%
+  filter(partial_match=='TRUE')
+
+
+## cases where individuals listed similar secondary / primary org?
+to_fix3 <- q3_othr %>% mutate(partial_match=str_detect(q3_several_2,q3_several_1)) %>%
+  filter(partial_match=='TRUE')
+
+## cases where individuals listed similar primary / tertiary org?
+to_fix4 <- q3_othr %>% mutate(partial_match1=str_detect(q3_several_1,q3_several_3),
+                               partial_match2=str_detect(q3_several_3,q3_several_1)) %>%
+  mutate(partial_match=ifelse(partial_match1==TRUE | partial_match2==TRUE, TRUE, FALSE)) %>%
+  select(-partial_match1,-partial_match2) %>%
+  filter(partial_match=='TRUE') ## none!
+
+
+## cases where individuals listed similar secondary / tertiary org?
+to_fix5 <- q3_othr %>% mutate(partial_match1=str_detect(q3_several_2,q3_several_3),
+                               partial_match2=str_detect(q3_several_3,q3_several_2)) %>%
+  mutate(partial_match=ifelse(partial_match1==TRUE | partial_match2==TRUE, TRUE, FALSE)) %>%
+  select(-partial_match1,-partial_match2) %>%
+  filter(partial_match=='TRUE') ## none!
+
+## cases where individuals listed similar tertiary / fourth org?
+to_fix5 <- q3_othr %>% mutate(partial_match1=str_detect(q3_several_4,q3_several_5),
+                               partial_match2=str_detect(q3_several_5,q3_several_4)) %>%
+  mutate(partial_match=ifelse(partial_match1==TRUE | partial_match2==TRUE, TRUE, FALSE)) %>%
+  select(-partial_match1,-partial_match2) %>%
+  filter(partial_match=='TRUE') ## none!
+
+rm(to_fix,to_fix2,to_fix3,to_fix4,to_fix5)
+
+
+
+# All Other Clean up Part 3b: Revisit Research Groups & othr small things ----------------
+## there are multiple research groups at the same university
+##   who are associated with different sites.
+##   make sure our data set has that specificity
+##   for when we're building the SEN.
+
+## UCSB ##
+ucsb <- q3_othr %>%
+  pivot_longer(all_of(starts_with('q3')),names_to='level',values_to='org_name') %>%
+  filter(grepl('University of California Santa Barbara', org_name)) %>%
+  select(response_id) %>% distinct() %>% left_join(q3_othr) # no one
+rm(ucsb)
+## HUMBOLDT ##
+humboldt <- q3_othr %>%
+  pivot_longer(all_of(c(starts_with('q'),starts_with('org'))),names_to='level',values_to='org_name') %>%
+  filter(grepl('Humboldt', org_name)) %>%
+  select(response_id) %>% distinct() %>% left_join(q3_othr)
+## university overall is ok
+
+rm(humboldt)
+
+## DOUBLE RESPONSE ##
+q3_double <- filter(q3_othr, recipient_first_name=='Carrie')
+# which survey more complete for the questions we care about?
+View(dat_survey %>% filter(response_id %in% q3_double$response_id))
+# ugh just use finish=TRUE
+q3_othr %<>% filter(response_id != 'R_5wNdsmuPRtT41S9')
+q3_othr %<>% mutate(q3_individual_1=ifelse(response_id=='R_6tLmKtUmSAbqmXf', 'University of California Santa Cruz',q3_individual_1))
+
+
+################################## Combined ################################## 
+
+
+# Merge data frames -------------------------------------------------------
+all(colnames(q3_clean) %in% colnames(q3_othr))
+q3_out <- bind_rows(q3_clean,q3_othr)
+
 # Merge first listed org --------------------------------------------------
 
-q3_clean %<>% mutate(org_name=ifelse(is.na(q3_individual_1),q3_several_1,q3_individual_1))
-any(is.na(q3_clean$org_name))
+q3_out %<>% mutate(org_name=ifelse(is.na(q3_individual_1),q3_several_1,q3_individual_1))
+any(is.na(q3_out$org_name))
 
 # Create one multi-org column ---------------------------------------------
 
-multis_collapse <- q3_clean %>% 
+multis_collapse <- q3_out %>% 
   pivot_longer(starts_with('q3_several'), names_to='tmp', values_to='all_orgs') %>%
   filter(!is.na(all_orgs)) %>%
   group_by(response_id) %>% 
   summarise(multi_org=paste0(unique(all_orgs), collapse=","))
 
-q3_clean %<>% select(response_id, org_name, starts_with('q3')) %>%
+q3_out %<>% select(response_id, org_name, starts_with('q3')) %>%
   left_join(multis_collapse)
-  
+
 
 # Save --------------------------------------------------------------------
 
 ## in russian
-q3_clean %>%
+q3_out %>%
   write_csv(here('data','sen',paste0('processed_by_responseID_orgs_4sen_',Sys.Date(),'.csv')))
 ## in SEN repo
-q3_clean %>%
-  write_csv(here('../','california-kelp-SEN','data','survey','confidential',
-                 paste0('processed_by_responseID_orgs_4sen_',Sys.Date(),'.csv')))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# q3_clean %>%
+#   write_csv(here('../','california-kelp-SEN','data','survey','confidential',
+#                  paste0('processed_by_responseID_orgs_4sen_',Sys.Date(),'.csv')))
 
 
 
