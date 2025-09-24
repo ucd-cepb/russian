@@ -64,6 +64,7 @@ head(q11)
 ## save!!
 q3q11 <- q3 %>% left_join(q11, by='response_id')
 q3q11 %<>% mutate(direct_observer=ifelse(response_id %in% do, '1','0'))
+
 write_csv(q3q11, here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_4sen_',d.out,'.csv')))
 
 ## reformat. we want each ego to be matched with every alter so we can compare all pairs.
@@ -262,11 +263,29 @@ with(filtdat2, table(category))
 # 18              26 
 #   
 
-# 2+ ORGS: Removing Alters ------------------------------------------
+## removing alters?
 ## remove alter IF first ego listed is also an exact match for an alter, and there is more than one alter
 tofix_alter <- filter(filtdat2, category=='exact-first ego' & n_alter>1) %>%
   select(response_id) %>% distinct() %>% left_join(orgdat2) %>% distinct()
 
+## removing egos?
+## remove ego IF second or later ego listed is also an exact match for an alter
+tofix_ego <- filter(filtdat2, category=='exact-other ego') %>%
+  select(response_id) %>% distinct() %>% left_join(orgdat2)
+
+## how many have both?
+sum(unique(tofix_alter$response_id) %in% unique(tofix_ego$response_id))
+
+## adjust to create three data frames for changing stuff
+tofix_both <- filter(tofix_alter, response_id %in% tofix_ego$response_id)
+tofix_alter %<>% filter(!response_id %in% tofix_both$response_id)
+tofix_ego %<>% filter(!response_id %in% tofix_both$response_id)
+
+## create output data frame
+orgdat2_out <- filter(orgdat2, !(response_id %in% c(tofix_both$response_id, tofix_alter$response_id, tofix_ego$response_id)))
+
+
+# 2+ ORGS: Removing Alters ------------------------------------------
 update_alter <- tofix_alter %>%
   left_join( tofix_alter %>% filter(ego_level=='q3_several_1') %>% dplyr::select(response_id,ego) %>% 
                distinct() %>%
@@ -279,7 +298,9 @@ all(tofix_alter$response_id %in% update_alter$response_id)
 update_alter %>% group_by(response_id) %>% summarise(n=length(unique(alter)))
   
 ## update the orgdat2 data frame
-orgdat2_update <- orgdat2 %>% filter(!(response_id %in% update_alter$response_id)) %>%
+any(update_alter$response_id %in% orgdat2_out$response_id) # needs to be false
+
+orgdat2_out %<>%
   bind_rows(update_alter)
 
 ## update q3q11_out 
@@ -301,41 +322,84 @@ qc_df %<>% bind_rows(
 )
 
 
-#################################### PAUSED HERE ON 9/23 ####################################
+
 # 2+ ORGS: Removing egos --------------------------------------------------
+View(tofix_ego)
+update_ego <- tofix_ego %>%
+  left_join( tofix_ego %>% filter(alter==ego) %>% 
+               rename(rmv_ego=alter) %>%
+               dplyr::select(response_id, rmv_ego) %>% 
+               distinct(), by='response_id')
+## check
+View(update_ego %>% filter(ego_level=='q3_several_1') %>%
+       dplyr::select(response_id,recipient_first_name,recipient_last_name,email,ego,rmv_ego) %>% distinct())
 
-## remove ego IF second or later ego listed is also an exact match for an alter
-tofix_ego <- filter(filtdat2, category=='exact-other ego') %>%
-  select(response_id) %>% distinct() %>% left_join(orgdat2_update)
+## make changes
+update_ego2 <- update_ego %>% mutate(rmv_ego=case_when(
+  response_id=='R_1GBVWsZocl0VprB' ~ NA,
+  response_id=='R_1LY9bZGoDJpKr8U'~ NA,
+  response_id=='R_1QxOFb6rcRAJfNj' & grepl('Davis',rmv_ego) ~ NA,
+  response_id=='R_1qyNTuTpApbsKrv' ~ NA,
+  response_id=='R_5vldi5R3qII19F6' ~ NA,
+  response_id=='R_7417rkzwocKka1y' ~ NA,
+  response_id=='R_3iPGxjt8gAiTFfa' ~ NA,
+  response_id=='R_51QOureZvOe4yuD' ~ NA,
+  .default=rmv_ego
+)) %>% filter(!is.na(rmv_ego)) %>% dplyr::select(response_id,rmv_ego) %>% distinct() %>% rename(ego=rmv_ego)
 
-## how many have both?
-sum(unique(tofix_alter$response_id) %in% unique(tofix_ego$response_id))
+View(update_ego2)
 
-## adjust to create three data frames for changing stuff
-tofix_both <- filter(tofix_alter, response_id %in% tofix_ego$response_id)
-tofix_alter %<>% filter(!response_id %in% tofix_both$response_id)
-tofix_ego %<>% filter(!response_id %in% tofix_both$response_id)
-
-## create output data frame
-orgdat2_out <- filter(orgdat2, !(response_id %in% filtdat2$response_id))
-
-
-# 2+ ORGS: Exact Ego-Alter Match change ALTER -----------------------------
-filtdat2a <- filter(filtdat2, response_id %in% tofix_alter$response_id)
-filtdat2a
-
-## put the two with 1 alter back into the data set (don't remove any alters, to avoid filtering them out of the social network)
-update_alter <- tofix_alter %>% filter(response_id %in% filter(filtdat2a, n_alter==1)$response_id)
-update_alter  # both alters are reef check, respondents involved in reef check and other vol activities
+update_alter2 <- filter(update_ego, response_id %in% c('R_1GBVWsZocl0VprB','R_1LY9bZGoDJpKr8U','R_1qyNTuTpApbsKrv',
+                                                       'R_5vldi5R3qII19F6','R_7417rkzwocKka1y','R_3iPGxjt8gAiTFfa',
+                                                       'R_51QOureZvOe4yuD'))  %>%
+  bind_rows(filter(update_ego, response_id=='R_1QxOFb6rcRAJfNj' & grepl('Davis',rmv_ego)))%>%
+  dplyr::select(response_id, rmv_ego) %>%
+  rename(alter=rmv_ego) %>% distinct()
+View(update_alter2)
 
 
-tofix_alter %<>% anti_join(update_alter)
+update_ego %<>% dplyr::select(-rmv_ego) %>% distinct()
+update_ego %<>% anti_join(update_ego2)
+update_ego %<>% anti_join(update_alter2)
+update_ego %<>% filter(!(response_id=='R_1MEiTDdy7UTusoz' & ego %in% c('California Ocean Protection Council',
+                                                                        'California Sea Grant',
+                                                                        'Kelp Forest Alliance')))
+update_ego
 
-update_alter %<>% bind_rows(
-  tofix_alter %>% filter(response_id=='R_5i7YPwDuFEqceK9' & alter != 'Reef Check')
-) %>% bind_rows(
-  tofix_alter %>% filter(response_id=='R_50f07NmTN6tehhY' & alter != 'University of California Davis')
-)
+# check how many alters each person has, and that we retained all individuals
+all(tofix_ego$response_id %in% update_ego$response_id)
+update_ego %>% group_by(response_id) %>% summarise(n=length(unique(alter)))
+
+## update the orgdat2 data frame
+any(update_ego$response_id %in% orgdat2_out$response_id) # needs to be false
+
+orgdat2_out %<>%
+  bind_rows(update_ego)
+
+## update q3q11_out 
+q3q11_out %<>% filter(!(response_id %in% update_ego$response_id)) %>%
+  bind_rows(update_ego %>%
+              pivot_wider(names_from='ego_level',values_from='ego') %>%
+              mutate(org_name=q3_several_1) %>%
+              ## need to replace multi org column
+              left_join(
+                update_ego %>% group_by(response_id) %>%
+                  summarise(multi_org=paste0(unique(ego),collapse=','))) %>%
+              mutate(multi_org=ifelse(multi_org==q3_several_1, NA, multi_org)))
+
+
+## record sample sizes for QC
+# qc_df %<>% bind_rows(
+#   filter(filtdat2, category=='exact-first ego' & n_alter>1) %>%
+#     rename(n_alters=n_alter) %>%
+#     group_by(q3, category, rc_or_g2kr,n_alters) %>%
+#     summarise(n=length(unique(response_id)))
+# )
+
+#################################### PAUSED HERE ON 9/23 ####################################
+# ORG 2+ : Adjusting ego and alter ----------------------------------------
+View(tofix_both)
+
 
 # View(update_alter)
 
