@@ -23,9 +23,10 @@ library(here)
 library(magrittr)
 library(janitor)
 #
-
 d.in <- '2025-09-23'
 d.out <- d.in
+#
+write_out <- FALSE
 
 # Data --------------------------------------------------------------------
 
@@ -63,9 +64,9 @@ head(q11)
 
 ## save!!
 q3q11 <- q3 %>% left_join(q11, by='response_id')
-q3q11 %<>% mutate(direct_observer=ifelse(response_id %in% do, '1','0'))
+q3q11 %<>% mutate(direct_observer=ifelse(response_id %in% do, '1','0'))  
 
-write_csv(q3q11, here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_4sen_',d.out,'.csv')))
+if(write_out){   write_csv(q3q11, here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_4sen_',d.out,'.csv')))   }
 
 ## reformat. we want each ego to be matched with every alter so we can compare all pairs.
 orgdat <- q3q11 %>% select(-org_name,-multi_org) %>%   ## this is either q3_individual_1 or q3_several_1
@@ -168,14 +169,14 @@ q3q11_out %<>%
   bind_rows(update %>%
               pivot_wider(names_from='ego_level',values_from='ego') %>%
               mutate(org_name=q3_individual_1,multi_org=NA))
-q3q11_out %>%
-write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',d.out,'.csv')))
+if(write_out){  q3q11_out %>%
+write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',d.out,'.csv')))   }
 
 # 
 # 
-q3q11_out %>%
+if(write_out){  q3q11_out %>%
   dplyr::select(response_id, org_name, starts_with('q3'), multi_org, type, alter) %>%
-  write_csv(here('data','sen',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',d.out,'.csv')))
+  write_csv(here('data','sen',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',d.out,'.csv')))   }
 
 
 rm(filtdat0,filtdat00,orgdat0,orgdat00)
@@ -227,8 +228,8 @@ q3q11_out %<>%
               pivot_wider(names_from='ego_level',values_from='ego') %>%
               mutate(org_name=q3_individual_1,multi_org=NA))
 
-q3q11_out %>%
-  write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen_',d.out,'.csv')))
+if(write_out){   q3q11_out %>%
+  write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen_',d.out,'.csv')))    }
 
 
 # q3q11_out %>%
@@ -267,19 +268,26 @@ with(filtdat2, table(category))
 ## remove alter IF first ego listed is also an exact match for an alter, and there is more than one alter
 tofix_alter <- filter(filtdat2, category=='exact-first ego' & n_alter>1) %>%
   select(response_id) %>% distinct() %>% left_join(orgdat2) %>% distinct()
+length(unique(tofix_alter$response_id)) #16
 
 ## removing egos?
 ## remove ego IF second or later ego listed is also an exact match for an alter
 tofix_ego <- filter(filtdat2, category=='exact-other ego') %>%
   select(response_id) %>% distinct() %>% left_join(orgdat2)
+length(unique(tofix_ego$response_id)) #26
 
 ## how many have both?
-sum(unique(tofix_alter$response_id) %in% unique(tofix_ego$response_id))
+sum(unique(tofix_alter$response_id) %in% unique(tofix_ego$response_id))  #14
 
 ## adjust to create three data frames for changing stuff
 tofix_both <- filter(tofix_alter, response_id %in% tofix_ego$response_id)
 tofix_alter %<>% filter(!response_id %in% tofix_both$response_id)
 tofix_ego %<>% filter(!response_id %in% tofix_both$response_id)
+length(unique(tofix_both$response_id)) #14
+length(unique(tofix_alter$response_id)) #2
+length(unique(tofix_ego$response_id)) #12
+
+
 
 ## create output data frame
 orgdat2_out <- filter(orgdat2, !(response_id %in% c(tofix_both$response_id, tofix_alter$response_id, tofix_ego$response_id)))
@@ -396,38 +404,199 @@ q3q11_out %<>% filter(!(response_id %in% update_ego$response_id)) %>%
 #     summarise(n=length(unique(response_id)))
 # )
 
-#################################### PAUSED HERE ON 9/23 ####################################
+
 # ORG 2+ : Adjusting ego and alter ----------------------------------------
 View(tofix_both)
+tofix_both_wide <- tofix_both %>% pivot_wider(names_from='ego_level', values_from='ego')
+
+## 4 cases where volunteer divers / cit scientists were involved on behalf of all listed as alters. all of which were
+##    a combo of RC, G2KR, and WA. didn't change any of these. 
+
+update_both_wide <- bind_rows(
+  ## remove alter for first listed ego, remove all other egos
+  filter(tofix_both_wide, response_id %in% c('R_1AGjFLTVbTA4HTj','R_5rju7W12HtPajKX','R_7GVc2EVkNJq5OuE')) %>%
+    filter(alter != q3_several_1) %>%
+    mutate(q3_several_2=NA, q3_several_3=NA),
+  
+  ## removal alters only
+  filter(tofix_both, response_id %in% c('R_3eavCPS10YuL9kK','R_3LjybcSyBNIJe9f')) %>%
+    anti_join(
+      filter(tofix_both, response_id %in% c('R_3eavCPS10YuL9kK','R_3LjybcSyBNIJe9f')) %>%
+        filter(ego==alter) %>% dplyr::select(response_id,ego) %>%
+        rename(alter=ego) %>% distinct(),
+    by=c('response_id','alter')) %>% pivot_wider(names_from='ego_level', values_from='ego'),
+  
+  ## remove specific ego, two alters
+  filter(tofix_both_wide, response_id=='R_7upUSPV19KS9FVh') %>%
+    mutate(q3_several_3=NA) %>%    ## MLML-SSL
+    filter(alter != q3_several_1 & alter != q3_several_2),
+  
+  ## remove ego only
+  filter(tofix_both, response_id %in% c('R_5R8mhuPcpBgJCfg')) %>%
+    anti_join(
+      filter(tofix_both, response_id %in% c('R_5R8mhuPcpBgJCfg')) %>%
+        filter(ego==alter & ego_level != 'q3_several_1') %>% dplyr::select(response_id,ego) %>%
+        distinct(),
+      by=c('response_id','ego')) %>% filter(alter!=ego) %>%
+    pivot_wider(names_from='ego_level', values_from='ego'),
+  
+  ## move CDFW from ego to alter for one respondent in DISES.
+  filter(tofix_both_wide, response_id =='R_5rju7W12HtPajKX') %>%
+    mutate(alter=ifelse(grepl('North coast Evaluation',alter),'California Department of Fish and Wildlife',alter),
+           q3_several_3=NA) %>%
+    filter(alter != q3_several_2)
+    
+)
 
 
-# View(update_alter)
 
-# Save VERSION: Changes to here -------------------------------------------
+View(update_both_wide)
 
-## this is for when we assign individuals to administrative areas. Egos are changed only for respondents
-##    who work as an individual
-# write_csv(here('_updateINDfilterALTER'))
+## update the orgdat2 data frame
+any(update_both_wide$response_id %in% orgdat2_out$response_id) # needs to be false
 
-# 2+ ORGS: Exact Ego-Alter Match change EGO -----------------------------
+orgdat2_out %<>%
+  bind_rows(update_both_wide %>% pivot_longer(starts_with('q3_'), names_to='ego_level',values_to='ego') %>%
+              filter(!is.na(ego)))
 
-## split 'both' into respondents who exclusively listed rc / g2kr as both ego and alter
-# tofix_both_rc <- filter(tofix_both, )
+## update q3q11_out 
+q3q11_out %<>% filter(!(response_id %in% update_both_wide$response_id)) %>%
+  bind_rows(update_both_wide %>%
+              mutate(org_name=q3_several_1) %>%
+              ## need to replace multi org column
+              left_join(
+                update_both_wide %>% pivot_longer(starts_with('q3_'), names_to='ego_level',values_to='ego') %>%
+                  filter(!is.na(ego)) %>%
+                  summarise(multi_org=paste0(unique(ego),collapse=',')), by='response_id') %>%
+              mutate(multi_org=ifelse(multi_org==q3_several_1, NA, multi_org)))
 
-## manually update
-# update_both <- filter(tofix_both, response_id=='R_1AGjFLTVbTA4HTj') %>%
-#   filter(!alter %in% c('University of California Santa Cruz','The Nature Conservancy')) %>%
-#   filter(ego != 'California Department of Fish and Wildlife') %>%
-#   bind_rows(
-#     
-#   )
 
 
+# SAVE THIS VERSION: Changes to here --------------------------------------
+
+## fix the number for multiple orgs: when enough egos were removed that there is only one org for that respondent
+q3q11_out %>% filter(is.na(q3_individual_1) & !is.na(q3_several_1) & is.na(multi_org))
+q3q11_out %<>% mutate(q3_individual_1=ifelse(is.na(q3_individual_1) & 
+                                                      !is.na(q3_several_1) & is.na(multi_org), q3_several_1,q3_individual_1)) %>%
+  mutate(q3_several_1=ifelse(!is.na(q3_individual_1) & !is.na(q3_several_1) & is.na(multi_org), NA,q3_several_1))
+q3q11_out %>% filter(is.na(q3_individual_1) & !is.na(q3_several_1) & is.na(multi_org))
+
+## fix the number for multiple orgs: when we removed org #2 but not org #3
+q3q11_out %>% filter(is.na(q3_several_1) & !is.na(q3_several_2))
+q3q11_out %>% filter(is.na(q3_several_2) & !is.na(q3_several_3))
+q3q11_out %<>% mutate(q3_several_2=ifelse(is.na(q3_several_2) & !is.na(q3_several_3),q3_several_3,q3_several_2)) %>%
+  mutate(q3_several_3=ifelse(q3_several_3==q3_several_2,NA,q3_several_3))
+q3q11_out %>% filter(is.na(q3_several_2) & !is.na(q3_several_3))
+
+## fix the number for multiple orgs: when we removed org #2,3 but not org #4... NONE!
+q3q11_out %>% filter(is.na(q3_several_2) & !is.na(q3_several_4))
+q3q11_out %>% filter(is.na(q3_several_3) & !is.na(q3_several_4))
+
+if(write_out){   q3q11_out %>%
+    write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateORG_4sen_',d.out,'.csv')))    }
+
+
+# q3q11_out %>%
+#   write_csv(here('../california-kelp-SEN','data','survey','confidential',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen_',Sys.Date(),'.csv')))
+
+
+# ORG 2+ : Check other egos -----------------------------------------------
+## for anyone who listed >2 egos, check
+many_egos <- filter(q3q11_out, !is.na(q3_several_3))
+length(unique(many_egos$response_id))  ## 17
+
+many_egos_long <- many_egos %>% pivot_longer(starts_with('q3_'), names_to='ego_level',values_to='ego') %>%
+  dplyr::select(-multi_org) %>%
+  filter(!is.na(ego)) %>% distinct()
+
+# View(filter(dat_survey, response_id=='R_50v3Pt1UGJw51HP'))
+
+
+update_many_egos <- bind_rows(
+  filter(many_egos_long, response_id=='R_3rlB6ugHMc8cqTQ') %>%
+    filter(!(ego %in% c('Moss Landing Marine Laboratories','Greater Farallones Assoc and NMS',
+                        'The Nature Conservancy','University of California Davis - Bodega Marine Laboratory'))),
+  filter(many_egos_long, response_id=='R_73yGa8USaSXYR0T') %>%
+    filter(!(ego %in% c('University of California Davis',
+                        'California Department of Fish and Wildlife',
+                        'Monterey Bay National Marine Sanctuary',
+                        'California Ocean Protection Council'))),
+  filter(many_egos_long, response_id=='R_50v3Pt1UGJw51HP') %>%
+    filter(!(ego %in% c('The Nature Conservancy',
+                        'California Sea Grant'))),
+  filter(many_egos_long, response_id=='R_6u3YTDhcZ4dOrtv') %>%
+    filter(!(ego %in% c('California Ocean Protection Council','California Department of Fish and Wildlife'))),
+  
+  filter(many_egos_long, response_id=='R_56D6mBrAXbvzaBX') %>%
+    filter(!(ego %in% c('The Nature Conservancy','California Sea Grant'))),
+  
+  filter(many_egos_long, response_id=='R_5dGJi242F31TvPK') %>%
+    filter(!(ego %in% c('Seatrees','California Sea Grant'))),
+)
+
+## pivot wider
+update_many_egos_wide <- update_many_egos %>% dplyr::select(-ego_level, -ego) %>%
+  distinct() %>%
+  ## first, update numbering for egos
+  left_join(update_many_egos %>% dplyr::select(response_id,ego_level,ego) 
+            %>% distinct() %>%
+              arrange(response_id,ego_level) %>%
+              group_by(response_id) %>% mutate(ego_level=paste0('q3_several_',1:n())),
+            by='response_id') %>%
+  ## update the multi org column
+  group_by(response_id) %>% mutate(multi_org=paste0(unique(ego),collapse=',')) %>%
+  ## now, pivot wider
+  pivot_wider(names_from='ego_level', values_from='ego') %>%
+  ## remove multi_org if there is only one ego now
+  mutate(multi_org=ifelse(multi_org==q3_several_1,NA,multi_org)) %>%
+  ## change 'several_1' to 'individual_1' if there is only one ego now
+  mutate(q3_individual_1=ifelse(is.na(multi_org), q3_several_1,NA),
+         q3_several_1=ifelse(is.na(multi_org),NA,q3_several_1))
+
+## add an alter: California Ocean Protection Council for  R_73yGa8USaSXYR0T
+update_many_egos_wide %<>% bind_rows(
+  filter(update_many_egos_wide, response_id=='R_73yGa8USaSXYR0T') %>%
+    slice(1) %>% mutate(alter='California Ocean Protection Council', type='q11_x'),
+  ## add an alter: The Nature Conservancy, California Sea Grant for R_50v3Pt1UGJw51HP
+  bind_rows(filter(update_many_egos_wide, response_id=='R_50v3Pt1UGJw51HP') %>%
+              slice(1) %>% mutate(alter='The Nature Conservancy', type='q11_x'),
+            filter(update_many_egos_wide, response_id=='R_50v3Pt1UGJw51HP') %>%
+              slice(1) %>% mutate(alter='California Sea Grant', type='q11_x') ),
+  ## add an alter: CA sea grant for R_56D6mBrAXbvzaBX
+  filter(update_many_egos_wide, response_id=='R_56D6mBrAXbvzaBX') %>%
+    slice(1) %>% mutate(alter='California Sea Grant', type='q11_x'),
+  ## add an alter: Seatrees, CA Sea Grant for R_5dGJi242F31TvPK
+  bind_rows( filter(update_many_egos_wide, response_id=='R_5dGJi242F31TvPK') %>%
+               slice(1) %>% mutate(alter='California Sea Grant', type='q11_x'),
+             filter(update_many_egos_wide, response_id=='R_5dGJi242F31TvPK') %>%
+               slice(1) %>% mutate(alter='Seatrees', type='q11_x')  )
+)
+
+## does anyone who previously didn't have an alter, have one now?
+no_alter <- filter(update_many_egos_wide, is.na(alter))
+has_alter <- no_alter$response_id[which(no_alter$response_id %in% filter(update_many_egos_wide, !is.na(alter))$response_id)]
+
+update_many_egos_wide %<>% filter(!(is.na(alter) & response_id %in% has_alter))
+update_many_egos_wide %<>% arrange(response_id,type)
+
+colnames(q3q11_out)[which(!colnames(q3q11_out) %in% colnames(update_many_egos_wide))]
+colnames(update_many_egos_wide)[which(!colnames(update_many_egos_wide) %in% colnames(q3q11_out))]
+
+## add to output data frame
+
+q3q11_out %<>% filter(!(response_id %in% update_many_egos_wide$response_id)) %>%
+  bind_rows(update_many_egos_wide)
 
 # Save --------------------------------------------------------------------
 
+## did we end up removing any individuals? no!
+all(q3q11$response_id %in% q3q11_out$response_id)
 
-# write_csv(here('_updateINDfilterALTERfilterEGO'))
+
+if(write_out){   q3q11_out %>%
+    write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateORGmanEGO_4sen_',d.out,'.csv')))    }
 
 
+q3q11_out %>%
+  write_csv(here('../california-kelp-SEN','data','survey','confidential',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateORGmanEGO_4sen_',d.out,'.csv')))
 
