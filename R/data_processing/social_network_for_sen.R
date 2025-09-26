@@ -53,7 +53,7 @@ snames <- survey %>% select(response_id, recipient_first_name, recipient_last_na
 snames %<>% filter(response_id %in% dat$response_id)
 
 ## direct observers
-dat_lvl <- read_csv(here('../','california-kelp-sen','data','survey', 'confidential', 'processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_leveled_2025-09-03.csv'))
+dat_lvl <- read_csv(here('confidential_data','processed','datares_by_responseID_wCounty_2025-09-23.csv'))
 
 
 ##  [[  save out surveys that have emails but no name  ]]
@@ -78,11 +78,11 @@ dat %>% select(alter) %>% distinct() %>%
 
 
 # First pass: only respondents 'on the water' -----------------------------
-ndat <- read_csv(here('../','california-kelp-SEN','data','kelp_sites','kelp_sites_confidential','final_assignments','areas_by_responseID_DataRes_STRICT_simplified.csv'))
-sen_ids <- ndat %>% select(response_id) %>% distinct() %>% pull(response_id)
-length(unique(sen_ids)) #113
-
-dat %<>% filter(response_id %in% sen_ids)
+# ndat <- read_csv(here('../','california-kelp-SEN','data','kelp_sites','kelp_sites_confidential','final_assignments','areas_by_responseID_DataRes_STRICT_simplified.csv'))
+# sen_ids <- ndat %>% select(response_id) %>% distinct() %>% pull(response_id)
+# length(unique(sen_ids)) #113
+# 
+# dat %<>% filter(response_id %in% sen_ids)
 
 # Create survey respondent ID key -----------------------------------------
 

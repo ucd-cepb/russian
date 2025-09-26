@@ -59,7 +59,7 @@ dat_survey %<>% filter(!(response_id %in% question_5_to_rmv))
 
 # Question 4: How are you involved in kelp-related issues? -------------------
 
-## info source q was number 9
+## activity / involvement q was number 4
 act.df <- dat_survey %>% 
   dplyr::select(response_id, starts_with("q4")) %>%
   filter(!if_all(starts_with("q4"), is.na))
@@ -69,7 +69,7 @@ act.df %<>%
   pivot_longer(cols = -c(response_id), names_to = "tmp", values_to = "activity") %>%
   dplyr::select(-tmp) %>% filter(!is.na(activity))
 
-## clean up "Other:" as an extra row
+## clean up "Other:" as an extra row. the actual other text responses are in their own rows.
 act.df %<>% filter(activity!='Other:')
 
 ## create a list of answers given to respondents:
@@ -84,24 +84,54 @@ act.df %>%
 
 ## add categories for respondents based on "other" responses (mary translated response IDs from gabby into activities)
 act.df %<>% bind_rows(
-  filter(act.df, activity %in% c('RC volunteer Diver','Volunteer','purple urchin removal', 'all sizes, Caspar, Calif.','Urchin Culling',
+  filter(act.df, activity %in% c('RC volunteer Diver','Volunteer','purple urchin removal, all sizes, Caspar, Calif.','Urchin Culling',
                       'Science-to-policy; policy development','ex situ preservation of kelp gametophytes (biobanking)',
-                      'Volunteering in kelp restoration','kelp forest surveys, culling urchins, outreach docent')) %>%
+                      'Volunteering in kelp restoration','kelp forest surveys, culling urchins, outreach docent',
+                      'Urchin culling','Urchin Culling','Government')) %>%
     mutate(activity='Environmental management'),
+  
+  filter(act.df, activity %in% c('purple urchin removal, all sizes, Caspar, Calif.','Urchin Culling','Urchin culling',
+                              'kelp forest surveys, culling urchins, outreach docent')) %>%
+    mutate(activity='Harvesting or fishing or growing'),   ## added 9/25 by Mary
+  
+  filter(act.df, activity %in% c('Experimental Restoration','Restoration and stewardship','restoration')) %>%
+    mutate(activity='Environmental management'),  ## added 9/25 by Mary
+  
+  filter(act.df, activity %in% c('Citizen science','citizen science','Surveys as citizen  scientist','Data collection','Data Collection')) %>%
+    mutate(activity= "Research"),
+  filter(act.df, activity %in% c('RC volunteer Diver','kelp forest surveys, culling urchins, outreach docent',
+                                 'Involvement as related to sea otter research','Otter research','Mitigation monitoring','Data collection',
+                                 'Experimental Restoration')) %>%
+    mutate(activity='Research'),  ## added 9/25 by Mary
+  filter(act.df, response_id=='R_7upUSPV19KS9FVh' & activity=='Environmental management') %>%
+    mutate(activity='Research'),  ## added 9/25 by Mary, see methods doc
+  filter(act.df, response_id=='R_61dpMIWMs89lZLY' & activity=='supporter') %>%
+    mutate(activity='Research'),  ## added 9/25 by Mary, see methods doc
   
   filter(act.df, activity %in% c('Informing management and policy','Science-to-policy; policy development')) %>%
     mutate(activity= "People management"),
   
-  filter(act.df, activity %in% c('Citizen science','Surveys as citizen  scientist','Data collection','Involvement as related to sea otter research')) %>%
-    mutate(activity= "Research"),
+  filter(act.df, activity %in% c('Supporting restoration diving operations')) %>%
+    mutate(activity= "People management"), ## added 9/25 by Mary
   
-  filter(act.df, activity %in% c('Donations','Teaching','supporter')) %>%
+  filter(act.df, activity %in% c('Donations','Teaching','supporter','')) %>%
     mutate(activity= "Advocacy or outreach"),  
+  
+  filter(act.df, activity %in% c('Film, photography, media','Media - film','kelp forest surveys, culling urchins, outreach docent')) %>%
+    mutate(activity= "Advocacy or outreach"),   ## added 9/25 by Mary
   
   filter(act.df, activity %in% c('Film, photography, media','Media - film')) %>%
     mutate(activity= "Recreation or tourism")
     )
 
+
+## simplify - some of the additions above may have created duplicate responses. 
+act.df %>% group_by(response_id,activity) %>% summarise(n=n()) %>% filter(n>1)
+act.df %<>% distinct()
+
+## does everyone have a given survey response recorded?
+check <- act.df %>% filter(activity %in% opts)
+all(act.df$response_id %in% check$response_id)  # TRUE!
 
 # explore -----------------------------------------------------------------
 
