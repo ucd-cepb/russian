@@ -3,19 +3,14 @@
 # Take the output from the script `process_orgs_3.R` and make sure 
 #    that organization names cross-ref each other, between 
 #    egos and alters. 
-# Alters are collaborators
-# Collaboration ties are created between ego-alter *and* between
-#    organizations with people working on behalf of multiple orgs
 # Save out an edgelist and an adjacency matrix for the kelp SEN.
-# The Level 1 SEN includes only those individuals who are
-#    counted as "systematic direct observers" in the kelp SEN
-# The Level 1+2 SEN includes collaboration ties among individuals
-#    who are *not* systematic direct observers, and between
-#    levels 1 and 2.
+# The first pass looks only at alters for those individuals who are
+#    counted as "systematic direct observers" in the kelp SEN (social
+#    layer 1)
 #
 #
 # 7/23/2025 - Mary Fisher
-# Last edited: 9/25/2025
+# Last edited: 7/23/2025
 #
 #######################################################################
 
@@ -29,20 +24,13 @@ library(tidyr)
 library(here)
 library(magrittr)
 library(janitor)
-#
-d.in <- '2025-09-23'
-# d.out <- Sys.Date()
-d.out <- d.in
-#
-# process_prefix <- 'updateINDupdateORG'
-process_prefix <- 'updateINDupdateORGmanEGO'
+
 
 
 # Data --------------------------------------------------------------------
 
 ## output from script 3: ego and alter orgs processed
-# dat <- read_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen_',d.in,'.csv')))
-dat <- read_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_',process_prefix,'_4sen_',d.in,'.csv')))
+dat <- read_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen_2025-08-04.csv')))
 
 ## survey data - grab just response IDs, names, and emails
 survey <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv')) %>%
@@ -50,11 +38,6 @@ survey <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv')) %>%
   slice(-c(1:2))
 
 snames <- survey %>% select(response_id, recipient_first_name, recipient_last_name, email)
-snames %<>% filter(response_id %in% dat$response_id)
-
-## direct observers
-dat_lvl <- read_csv(here('../','california-kelp-sen','data','survey', 'confidential', 'processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_leveled_2025-09-03.csv'))
-
 
 ##  [[  save out surveys that have emails but no name  ]]
 # snames %>%
@@ -72,8 +55,8 @@ snames %<>%
 snames %<>% filter(!is.na(recipient_first_name)) %>% select(response_id,recipient_first_name,recipient_last_name)
 
 ##  [[  save out all alters  ]]
-dat %>% select(alter) %>% distinct() %>%
-  write_csv(here('data','sen','levels12_alter_list.csv'))
+# dat %>% select(alter) %>% distinct() %>%
+#   write_csv(here('data','sen','alter_list.csv'))
 
 
 
@@ -88,26 +71,13 @@ dat %<>% filter(response_id %in% sen_ids)
 
 ## check for duplicate name - id matches. grab the id for the survey that the individual *finished*
 dup <- snames %>% group_by(recipient_first_name, recipient_last_name) %>% summarise(n=length(unique(response_id))) %>% filter(n>1)
-dup  # one person
 dup %<>% filter(!is.na(recipient_first_name)) %>%
   left_join(select(snames, recipient_first_name, recipient_last_name, response_id)) %>%
-  left_join(dat)
-## one person responded twice with different alters each time. clean this up.
-##   use the response id associated with the finished survey, but bring in extra info from the unfinished survey. 
-dup_update <- dup %>% filter(!(response_id=='R_6tLmKtUmSAbqmXf' & org_name=='University of California')) %>%
-  mutate(response_id='R_6tLmKtUmSAbqmXf', 
-         email=unique(dup$email[which(!is.na(dup$email))]) )
-##  remove duplicated alters and re-number them.
-dup_update %<>% dplyr::select(-type) %>% distinct() %>%
-  group_by(response_id) %>% mutate(type=paste0('q11_',1:n())) %>%
-  mutate(recipient_last_name='Pomeroy')
+  left_join(survey %>% select(response_id,finished,starts_with('q3'), starts_with('q11')))
+to_rmv <- dup %>% filter(finished=='False' & response_id!='R_6mLbnsU7eGt3zQ7')
 
 snames %<>% mutate(recipient_last_name=ifelse(recipient_last_name=='Pomerory', 'Pomeroy', recipient_last_name))
-snames %<>% filter(!(response_id %in% dup$response_id & !(response_id %in% dup_update$response_id)))
-
-## update dat!
-dat %<>% filter(!(response_id %in% dup$response_id)) %>%
-  bind_rows(dup_update %>% dplyr::select(-n))
+snames %<>% filter(!(response_id %in% to_rmv$response_id))
 
 
 
@@ -116,8 +86,7 @@ dat %<>% filter(!(response_id %in% dup$response_id)) %>%
 ## break names out of alters column
 datl <- dat %>% separate(alter, into=c('alter_org','alter_ind'), sep=':', remove=FALSE)
 alti <- datl %>% filter(!is.na(alter_ind))
-dim(datl) ; dim(alti) #267 out of 717 alters had names
-length(unique(datl$alter)); length(unique(alti$alter_ind)) ## 220 unique, 99 unique names
+dim(datl) ; dim(alti)
 
 alti %<>% select(response_id,alter,alter_org,alter_ind) %>% 
   mutate(alter_ind=str_trim(alter_ind)) %>%
@@ -127,28 +96,21 @@ alti %<>% select(response_id,alter,alter_org,alter_ind) %>%
 alti %<>% 
   mutate_at(c('alter_first_name','alter_last_name'), str_to_lower) %>%
   left_join(snames %>%
-              mutate(recipient_last_name=ifelse(recipient_last_name=='Basket','Baskett',recipient_last_name)) %>%
               mutate_at(c('recipient_first_name','recipient_last_name'), str_to_lower) %>%
               rename(alter_id=response_id), by=c('alter_first_name'='recipient_first_name','alter_last_name'='recipient_last_name'))
 
-View(alti %>% dplyr::select(alter_first_name,alter_last_name,alter_id) %>% distinct())
-
 ## revisit match: hyphenated / composite last names, shortened first names
-alti2 <- alti %>% filter(alter_last_name %in% c('murphy-cannella','giraldo','cuevas','arroyo') |
-                           alter_first_name %in% c('josh','matthew','dan','mike','jennifer'))
+alti2 <- alti %>% filter(alter_last_name %in% c('murphy-cannella','giraldo') |
+                           alter_first_name %in% c('josh','matthew','dan'))
 alti2 %<>% mutate(alter_last_name=case_when(
   alter_last_name=='murphy-cannella' ~ 'murphy',
   alter_last_name=='giraldo' ~ 'giraldo ospina',
-  alter_last_name=='cuevas' ~ 'cuevas uribe',
-  alter_last_name=='arroyo' ~ 'arroyo esquivel',
   .default=alter_last_name
 )) %>%
   mutate(alter_first_name=case_when(
     alter_first_name=='josh' ~ 'joshua',
     alter_first_name=='matthew' ~ 'matt',
     alter_first_name=='dan' ~ 'daniel',
-    alter_first_name=='mike' ~ 'michael',
-    alter_first_name=='jennifer' ~ 'jenn',
     .default=alter_first_name
   )) %>%
   dplyr::select(-alter_id) %>%
@@ -162,100 +124,57 @@ alti %<>% anti_join(alti2, by=c('response_id','alter','alter_org')) %>%
   bind_rows(alti2)
 rm(alti2)
 
-## how many are in our data set?
-length(alti %>% filter(!is.na(alter_id)) %>% pull(alter_id)) ## 117
-length(unique(alti %>% filter(!is.na(alter_id)) %>% pull(alter_id))) ## 32
 
-# Social ties between survey respondents: What to Expand? --------------------------
+# Social ties between survey respondents: Expand --------------------------
 ## link survey respondents to all organizations that individual alters 'work on behalf of.' ##
 
-## grab all affiliations for named alters in our survey data set
-alter_info <- alti %>% filter(!is.na(alter_id)) %>%
-  dplyr::select(alter_id,alter_org, alter) %>% distinct() %>%
+## grab all affiliations for alters in our survey data set
+alti %<>% filter(!is.na(alter_id))
+alter_info <- alti %>% dplyr::select(alter_id,alter_org, alter) %>%
   left_join(dat %>% dplyr::select(response_id,org_name,multi_org) %>% distinct(), by=c('alter_id'='response_id'))
 
-## how many named alters are affiliated with multiple organizations? 
-sum(!is.na(alter_info$multi_org)) ## 13
+## how many alters are affiliated with multiple organizations? 
+sum(!is.na(alter_info$multi_org)) ## 25
 
-## how many alters have a primary organization that doesn't match the alter info?
-length(filter(alter_info, alter_org != org_name) %>% pull(alter_id)) ## 6. three are different naming for the same org, my use of projects within orgs.
-View(filter(alter_info, alter_org != org_name))
+## how many alters are affiliated with one organization, and have a primary organization that doesn't match the alter info?
+length(filter(alter_info, alter_org != org_name) %>% pull(alter_id)) ## 6. all but one are different naming for the same org, my use of projects within orgs.
 
 ## create a new data frame to expand on alter org info. data frame has: orig_alter | alter
 new_alter_info <- alter_info %>% filter(alter_org != org_name & is.na(multi_org))
+new_alter_info %<>% filter(alter_org=='Giant Giant Kelp Restoration Project - Caspar Cove Project') %>%
+  bind_rows(new_alter_info %>% filter(alter_org=='Giant Giant Kelp Restoration Project - Caspar Cove Project') %>%
+              mutate(alter_org=org_name))
 
-## for name alters who we've affiliated with specific projects, add project name into alter name
-new_alter_info %<>% mutate(new_alter=NA) %>%
-  filter(!grepl(' - ', org_name)) %>%
-  bind_rows(new_alter_info %>% filter(grepl(' - ', org_name)) %>%
-              separate(col=alter, into=c('alter_org','alter_ind'), sep=':', remove=FALSE) %>%
-              unite('new_alter', org_name,alter_ind,sep=':', remove=FALSE) %>%
-              dplyr::select(colnames(new_alter_info), new_alter)
-              )
+new_alter_info %<>% dplyr::select(alter,alter_org) %>% separate(alter, into=c('tmp','alter_name'), sep=':',remove=FALSE) %>%
+  dplyr::select(-tmp) %>%
+  mutate(new_alter=case_when(grepl('Giant Giant',alter_org) ~ alter_org,
+                             grepl('Alliance',alter_org) ~ paste0(alter_org,': ',alter_name),
+                             .default=NA))
 
-## for one individual, adjust alter information to match self-identified affiliation. 
-new_alter_info %<>% filter(!grepl("Tolowa", alter)) %>% bind_rows( 
-  new_alter_info %>% filter(grepl("Tolowa", alter)) %>%
-    separate(col=alter, into=c('alter_org','alter_ind'), sep=':', remove=FALSE) %>%
-    unite('new_alter', org_name,alter_ind,sep=':', remove=FALSE) %>%
-    dplyr::select(colnames(new_alter_info), new_alter)
-)
+new_alter_info2 <- alter_info %>% filter(!is.na(multi_org))
 
-## !!!!  for one individual, update org name to be more specific
-new_ego_info <- filter(new_alter_info, alter_id %in% c('R_6D5kmxtODIPb1hT')) %>%
-  dplyr::select(alter_id, alter_org) %>% rename(response_id=alter_id,org_name=alter_org) %>% mutate(q3_individual_1=org_name)
-dat %<>% filter(response_id != new_ego_info$response_id) %>%
-  bind_rows(dat %>% filter(response_id == new_ego_info$response_id) %>%
-              dplyr::select(-colnames(new_ego_info)[2:3]) %>%
-              left_join(new_ego_info, by='response_id'))
-
-new_alter_info %<>% filter(alter_id != 'R_6D5kmxtODIPb1hT')
-
-## for remaining two individuals, add to alter orgs based on the alter's self-identified affiliation
-new_alter_info %<>%
-  bind_rows(
-    new_alter_info %>% filter(is.na(new_alter)) %>%
-      separate(col=alter, into=c('alter_org','alter_ind'), sep=':', remove=FALSE) %>%
-      dplyr::select(-new_alter) %>%
-      unite(col='new_alter', org_name, alter_ind, sep=':', remove=FALSE)
-  )
-new_alter_info %<>% mutate(new_alter=ifelse(is.na(new_alter), alter,new_alter))
-
-## thin out the data frame
-new_alter_info %<>% dplyr::select(alter,new_alter)
-
-# Social ties between survey respondents: Adjust & Expand ----------------------------
+new_alter_info2 %<>% separate(multi_org, into=c('org1','org2','org3','org4','org5','org6'), sep=',') %>%
+  dplyr::select(-org1) %>% pivot_longer(starts_with('org'), names_to='org_level',values_to='org_name') %>%
+  filter(!is.na(org_name)) %>%
+  separate(alter, into=c('tmp','alter_name'), sep=':',remove=FALSE) %>%
+  dplyr::select(-tmp) %>%
+  unite('new_alter',org_name,alter_name,sep=':')
+new_alter_info2 %<>% distinct()
+new_alter_info2 %<>% mutate(new_alter=str_replace(new_alter,' Cordell Bank','Cordell Bank'))
+new_alter_info2 %<>% dplyr::select(alter,new_alter)
 
 
-## part 1: replace the alters in our input data set!
+## replace the alters in our input data set!
 dat %<>% anti_join(new_alter_info, by='alter') %>%
   bind_rows(new_alter_info %>% left_join(dat, by='alter') %>%
               dplyr::select(-alter) %>% rename(alter=new_alter))
 
-## part 2: expand alters for named individuals affiliated with more than one organization
-expand_alter <- filter(alter_info,!is.na(multi_org)) # grab alters affiliated with 2+ orgs
-expand_alter %<>% separate(multi_org,into=c('alter.1','alter.2','alter.3','alter.4'), sep=',') %>% # separate out all orgs
-  pivot_longer(starts_with('alter.'), names_to='alter_level',values_to='new_alter') %>% filter(!is.na(new_alter))
-expand_alter %<>% filter(alter_org != new_alter) # remove alters we already have
-expand_alter %<>% filter(!(alter_id=='R_3ocCcrb6NY9Nk5I' & new_alter=='University of California Santa Cruz')) # ugh iterative fix to ego
-
-expand_alter %<>% separate(col=alter, into=c('alter_org','alter_ind'), sep=':', remove=FALSE) %>%  # add ind names to new alters
-  unite(col='new_alter', new_alter, alter_ind, sep=':', remove=TRUE)
-expand_alter2 <- expand_alter %>% dplyr::select(alter,new_alter)
-
-dat %<>% 
-  bind_rows(expand_alter2 %>% left_join(dat, by='alter') %>%
+dat %<>% anti_join(new_alter_info2, by='alter') %>%
+  bind_rows(new_alter_info2 %>% left_join(dat, by='alter') %>%
               dplyr::select(-alter) %>% rename(alter=new_alter))
 
-## ugh iterative fix to ego for dises member
-dat %<>% filter(response_id != 'R_3ocCcrb6NY9Nk5I') %>%
-  bind_rows(dat %>% filter(response_id == 'R_3ocCcrb6NY9Nk5I') %>%
-              mutate(q3_several_2=NA,multi_org=NA,
-                     q3_individual_1=q3_several_1) %>%
-              mutate(q3_several_1=NA))
-
 ## Check if it worked!
-dat %<>% distinct() %>% arrange(response_id,type)
+dat %<>% dplyr::select(-alter_name)
 View(dat) ## search for "Jon" and "Carr"
 
 
@@ -309,7 +228,7 @@ write_csv(all_orgs,here('data','sen','sn_match_ego_alter_organizations.csv'))
 
 # Create social network ---------------------------------------------------
 
-# First Level: Data Res collabs only ------------------------------------
+# First Pass: Data Res collabs only ------------------------------------
 dat_out <- dat
 
 ## read in names key
@@ -377,6 +296,7 @@ write_csv(mat_out, here('data','sen',paste0('sn_datares_STRICT_',Sys.Date(),'_ma
 
 # Second Pass: all collaborations -----------------------------------------
 
+## this step is completed in the california-kelp-SEN repository.
 
 
 

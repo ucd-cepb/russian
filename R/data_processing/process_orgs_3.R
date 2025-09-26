@@ -587,6 +587,11 @@ colnames(update_many_egos_wide)[which(!colnames(update_many_egos_wide) %in% coln
 q3q11_out %<>% filter(!(response_id %in% update_many_egos_wide$response_id)) %>%
   bind_rows(update_many_egos_wide)
 
+
+# DISES: Check other egos -------------------------------------------------
+## need to remove Santa Cruz for one individual
+
+
 # Save --------------------------------------------------------------------
 
 ## did we end up removing any individuals? no!
