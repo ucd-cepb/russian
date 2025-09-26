@@ -316,53 +316,116 @@ write_csv(all_orgs,here('data','sen',paste0('sn_match_ego_alter_organizations_',
 
 # First Level: Data Res collabs only ------------------------------------
 dat_out <- dat
+dat_out %<>% filter(response_id %in% dat_lvl$response_id)
+
+## we have to edit names first! ##
 
 ## read in names key
-key <- read_csv(here('data','sen','sn_match_ego_alter_organizations_KEY.csv'))
+key <- readxl::read_excel(here('data','sen',paste0('sn_match_ego_alter_organizations_',d.out,'_KEY.xlsx')), sheet='key')
 head(key)
 
-## apply re-naming to 'dat' dataframe. make sure we get all orgs for multi org respondents
-dat_out %<>% dplyr::select(-starts_with('q3')) %>%
-  separate(multi_org, into=c('org1','org2','org3','org4','org5','org6'), sep=',') %>%
-  mutate(org1=ifelse(is.na(org1), org_name,org1))
-
-any(is.na(dat_out$org1))
-
+## melt out data frame so that each 'ego' organization gets one row
 dat_out %<>% 
-  dplyr::select(-org_name) %>% pivot_longer(starts_with('org'), names_to='org_level',values_to='org_name') %>%
-  filter(!is.na(org_name))
+  pivot_longer(starts_with('q3_'), names_to='ego_level',values_to='ego') %>%
+  filter(!is.na(ego))
 
-dat_out %<>% dplyr::select(-alter_org) %>%
-  separate(alter,into=c('alter_org','alter_ind'),sep=':', remove=FALSE) %>%
-  mutate(alter_org=ifelse(alter_org %in% c('Commercial Diver','Artist','Photographer','Individual'), alter,alter_org))
-dat_out %<>% dplyr::select(-alter_ind)
+## make sure we're not missing any orgs, and that the 'org_name' column always represents the q3_1 org
+any(is.na(dat_out$org_name)); any(is.na(dat_out$ego)); any(is.na(dat_out$alter))
+any(filter(dat_out,ego_level=='q3_individual_1')$org_name != filter(dat_out,ego_level=='q3_individual_1')$ego) # false
+any(filter(dat_out,ego_level=='q3_several_1')$org_name != filter(dat_out,ego_level=='q3_several_1')$ego) #false
 
-dat_out %<>% left_join(key, by=c('org_name')) %>%
-  left_join(key %>% rename(sn_alter=sn_org_name,sn_alter_scale=sn_org_scale,sn_alter_type=sn_org_type), by=c('alter_org'='org_name'))
+# apply re-naming to 'dat' dataframe. make sure we get all orgs for multi org respondents
+dat_out %<>% dplyr::select(-org_name) %>%
+  separate(alter, into=c('alter','alter_ind'), sep=':') %>%
+  ## we need to keep names attached to artists, divers named as individuals
+  mutate(alter=ifelse(alter %in% c('Commercial Diver','Artist'), paste0(alter, ':', alter_ind),alter)) %>%
+  ## new names for egos
+  left_join(key, by=c('ego'='org_name')) %>%
+  ## new names for alters
+  left_join(key %>% rename(alter=org_name, sn_alter=sn_org_name,sn_alter_scale=sn_org_scale,sn_alter_type=sn_org_type), by=c('alter'))
 
-## missing? these are individuals *except* for the response
-##    who has individual only as the fourth org, and is affiliated with three other orgs.
+
+
+## missing an ego name? these are *all individuals*
 any(is.na(dat_out$sn_org_name))
 View(dat_out %>% filter(is.na(sn_org_name)))
 
-dat_out %<>% 
-  filter(!is.na(sn_org_name)) %>% #
-  bind_rows(
-    dat_out %>% filter(is.na(sn_org_name)) %>%
-      filter(response_id!='R_56D6mBrAXbvzaBX') %>% # skip this one
-      mutate(sn_org_name=paste0('Individual:',str_sub(response_id,-4))) %>%
-      mutate(sn_org_scale='Individual',sn_org_type=org_name)
-    )
+## rename individual according to last 4 digits of response ID
+##    except for the person who listed their 'individual' status as secondary to their organizational affiliation.
+dat_out %<>% filter(!is.na(sn_org_name)) %>%
+  bind_rows(dat_out %>%
+              filter(is.na(sn_org_name)) %>%
+              filter(ego_level != 'q3_several_2') %>%
+              mutate(ego=paste0('Individual:', str_sub(response_id, -4,-1))) %>%
+              mutate(sn_org_name=ego,sn_org_scale='Individual',sn_org_type='Individual')
+  )
 
-## missing? nope!
-dat_out %>% filter(is.na(sn_alter) & !is.na(alter))
+## missing a corrected alter name?
+any(is.na(filter(dat_out, !is.na(alter))$sn_alter))
+# View(filter(dat_out, !is.na(alter) & is.na(sn_alter)))
 
 ## save as data frame
-write_csv(dat_out, here('confidential_data','processed',paste0('sn_datares_STRICT_',Sys.Date(),'_4sen.csv')))
+write_csv(dat_out, here('confidential_data','processed',paste0('sn_datares_',process_prefix, '_',d.out,'_4sen.csv')))
 
-dat_out %>% group_by(sn_org_name,sn_org_scale,sn_org_type,sn_alter,sn_alter_scale,sn_alter_type) %>%
-  summarise(r=length(unique(response_id))) %>%
-  write_csv(here('data','sen',paste0('sn_datares_STRICT_',Sys.Date(),'_4sen.csv')))
+
+# Edge list and Matrix ----------------------------------------------------
+
+## first, do collabs
+el_out <- dat_out %>% group_by(sn_org_name,sn_org_scale,sn_org_type,sn_alter,sn_alter_scale,sn_alter_type) %>%
+  summarise(r=length(unique(response_id)))
+## remove self-ties
+el_out %<>% filter(sn_org_name != sn_alter)
+
+
+expand_unique <- function(x){
+  x <- x[,2,drop=TRUE]
+ tmp <- matrix(data=NA,nrow=length(x),ncol=length(x),dimnames=list(x,x))
+ k <- arrayInd(which(upper.tri(tmp)), dim(tmp))
+ out <- data.frame(org_name=rownames(tmp)[k[,1]], alter=colnames(tmp)[k[,2]])
+ return(out)
+}
+
+## next, do shared individuals (i.e., wherever two orgs were listed by a single individual)
+el_add <- dat_out %>% filter(!is.na(multi_org))
+## grab just the affiliations, no alters 
+el_add %<>% dplyr::select(response_id,ego_level,ego) %>% distinct()
+## next by response ID, use custom function to get all pairs *without inverse duplicates*
+el_add %<>% group_by(response_id) %>% nest() %>%
+  mutate(pairs=map(data, ~expand_unique(.x)))
+
+## unnest to get new ego x alter matches (and the number of individuals affiliated with both of the pair)
+el_add %<>% dplyr::select(-data) %>% unnest(c(response_id,pairs))
+el_add %<>% group_by(org_name,alter) %>% summarise(r=length(unique(response_id)))
+
+## bring in corrected names from key
+el_add %<>% left_join(key, by='org_name') %>%
+  left_join(key %>% rename(sn_alter=sn_org_name, sn_alter_scale=sn_org_scale, sn_alter_type=sn_org_type), by=c('alter'='org_name'))
+## fix NAs, which are individuals
+el_add %<>% filter(!is.na(sn_alter)) %>%
+  bind_rows(el_add %>% filter(is.na(sn_alter)) %>%
+              mutate(sn_alter=alter,sn_alter_scale='Individual',sn_alter_type='Individual'))
+
+all(colnames(el_add) %in% colnames(el_out))
+
+el_out %<>% bind_rows(el_add %>% ungroup() %>% dplyr::select(-org_name,-alter))
+
+## look up one multiple affiliate - THERE MAY BE INVERSE DUPLICATES IN THIS EDGE LIST. 
+filter(el_out, sn_org_name==el_out$sn_org_name[1])
+
+## temporary save so we don't lose work
+write_csv(el_out, here('data','sen',paste0('sn_datares_collab_multi_',process_prefix,'_',d.out,'_4sen.csv')))
+
+# clean up duplicates in edge list ----------------------------------------
+
+## turn into graph
+## simplify
+## have igraph put out edge list
+## re-attach names from key
+
+
+
+
+  
 
 ## as matrix
 mat_out <- dat_out %>% filter(!is.na(sn_alter)) %>%
