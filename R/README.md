@@ -10,5 +10,7 @@ Mary's workflow for producing social network:
 
 3. process_q4_activity, process_q9_source_of_info. *identify 'systematic direct observers' for the different levels of the sn in the social-ecological network.*
 
-4. social_network_for_sen. *some additional data cleaning of organization names. generate two edge lists for the sn in the social-ecological network.*
+4. sen_02_assign_respondent_categories_REF_ONLY. *identify 'systematic direct observers' for the different levels of the sn in the social-ecological network. This is actually done in the repository california-kelp-SEN so there can be cross-talk between this script and the script assigning actors to ecological nodes, but is placed here for reference.*
+
+5. social_network_for_sen. *some additional data cleaning of organization names. generate two edge lists for the sn in the social-ecological network. the version 'collabs only' does NOT add social ties between organizations that share employees / volunteers.*
 

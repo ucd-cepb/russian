@@ -275,6 +275,8 @@ all_egos <- unique(dat %>% dplyr::select(response_id,multi_org) %>%
                      ) %>%
                      pull(org_name))
 
+length(all_egos)
+
 all_alters <- dat %>% dplyr::select(response_id,alter) %>%
                        separate(alter,into=c('alter','alter_ind'), sep=':')
 
@@ -283,26 +285,29 @@ all_alters %<>% filter(!(alter %in% c('Commercial Diver','Artist','Photographer'
     unite('alter',alter, alter_ind, sep=':'))
 
 all_alters <- unique(filter(all_alters,!is.na(alter)) %>% pull(alter))
+length(all_alters)
+
 
 all_egos
 all_alters
 
 
 ## there are multiple project / lab names in the same organization.
-all_orgs <- data.frame(egos=all_egos) %>%
-  separate(egos, into=c('org_name','ego_subgroup'), sep=' - ') %>%
+all_orgs <- data.frame(egos_full_name=all_egos) %>%
+  separate(egos_full_name, into=c('org_name','ego_subgroup'), sep=' - ',remove=FALSE) %>%
   mutate(ego=1) %>%
   bind_rows(
     data.frame(alters=all_alters) %>%
       separate(alters, into=c('org_name','alter_subgroup'), sep=' - ') %>%
       mutate(alter=1)
   ) %>%
-    group_by(org_name) %>% summarise(ego=sum(ego,na.rm=TRUE),alter=sum(alter,na.rm=TRUE),
-                                     ego_sub=paste0(unique(ego_subgroup),collapse=','),
-                                     alter_sub=paste0(unique(alter_subgroup),collapse=','))
+  group_by(org_name) %>% summarise(ego_full_name=paste0(unique(egos_full_name),collapse=','),
+                                   ego=sum(ego,na.rm=TRUE),alter=sum(alter,na.rm=TRUE),
+                                   ego_sub=paste0(unique(ego_subgroup),collapse=','),
+                                   alter_sub=paste0(unique(alter_subgroup),collapse=','))
 
 ## save this to create a manual key
-write_csv(all_orgs,here('data','sen','sn_match_ego_alter_organizations.csv'))
+write_csv(all_orgs,here('data','sen',paste0('sn_match_ego_alter_organizations_',d.out,'.csv')))
 # 
 # data.frame(org_name=unique(c(all_egos,all_alters))) %>%
 #   write_csv(here('data','sen','sn_match_ego_alter_organizations_KEY.csv'))  ## this will overwrite existing key!!
