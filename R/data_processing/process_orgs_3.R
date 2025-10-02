@@ -5,8 +5,6 @@
 #   and which they *work directly with.* 
 # For "rules" on how this is done, check file: doc >> METHODS_survey_data_processing.docx
 #
-# To make my life easier, for individuals who work on behalf of two or more organizations,
-#   I only cleaned up data for those who directly observe conditions.
 #
 # Mary Fisher
 #
@@ -23,10 +21,12 @@ library(here)
 library(magrittr)
 library(janitor)
 #
-d.in <- '2025-09-23'
+source(here('R/subfxn/expand_org_names.R'))
+#
+d.in <- '2025-10-01'
 d.out <- d.in
 #
-write_out <- FALSE
+write_out <- TRUE
 
 # Data --------------------------------------------------------------------
 
@@ -34,11 +34,12 @@ write_out <- FALSE
 dat_survey <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv'))  %>%
   clean_names() %>%
   slice(-c(1:2))
-
+dat_survey %<>% filter(as.numeric(progress) > 75)
+dim(dat_survey)  # 190
 colnames(dat_survey)
 
 ## this is the cleaned up data on organizations that people work on behalf of
-q3 <- read_csv(here('data','sen',paste0('processed_by_responseID_orgs_4sen_',d.in,'.csv')))
+q3 <- read_csv(here('data','sen',paste0('processed_by_responseID_q3_orgs_4sen_',d.in,'.csv')))
 
 ## this is the cleaned up data on organizationst that people work directly with
 q11 <- read_csv(here('confidential_data','processed',paste0('processed_by_responseID_q11_collabs_4sen_',d.in,'.csv')))
@@ -61,6 +62,7 @@ qs_of_interest <- make_clean_names(c('response_id','status',"recipient_last_name
 ## combine q3 and q11 by response ID
 head(q3)
 head(q11)
+q3$response_id[which(!(q3$response_id %in% q11$response_id))]
 
 ## save!!
 q3q11 <- q3 %>% left_join(q11, by='response_id')
@@ -87,21 +89,24 @@ View( filter(orgdat, grepl('Individual',ego)) %>% filter(is.na(alter)) %>% left_
 to_rmv <- filter(orgdat, grepl('Individual',ego)) %>% filter(is.na(alter)) %>% left_join(loc,by='response_id') %>% filter(is.na(county))
 
 ## remove individuals with no location info, no alters, and no organization
-orgdat %<>% filter(!(response_id %in% to_rmv$response_id))
-q3q11_out <- q3q11 %<>% filter(!(response_id %in% to_rmv$response_id))
+# orgdat %<>% filter(!(response_id %in% to_rmv$response_id))
+# q3q11_out <- q3q11 %<>% filter(!(response_id %in% to_rmv$response_id))
+# 
+# qc_df %<>% bind_rows(
+#   data.frame(q3='Individual',
+#   category='no data',
+#   n_alters=0,
+#   rc_or_g2kr=0,
+#   n=length(to_rmv$response_id))
+# )
 
-qc_df %<>% bind_rows(
-  data.frame(q3='Individual',
-  category='no data',
-  n_alters=0,
-  rc_or_g2kr=0,
-  n=2)
-)
+q3q11_out <- q3q11
 
 # INDIVIDUAL: Reef Check or G2KR ------------------------------------------
 View( filter(orgdat, grepl('Individual',ego)) )
 ## one
-orgdat0 <- orgdat %>% filter(grepl('Individual',ego) & ego_level=="q3_individual_1")
+orgdat0 <- orgdat %>% filter(grepl('Individual',ego) & ego_level=="q3_individual_1") %>%
+  dplyr::select(response_id) %>% left_join(orgdat)
 orgdat0_n <- length(unique(orgdat0$response_id))
 ## first of several
 orgdat00 <- orgdat %>% filter(grepl('Individual',ego) & ego_level=="q3_several_1") %>%
@@ -129,19 +134,18 @@ tofix0
 
 tofix00 <- filtdat00 %>% filter(rc_or_g2kr > 0 & n_alter > 1) %>%  ## all n_alter > 1 when rc_or_g2kr > 0
   select(response_id) %>% left_join(orgdat00)
-tofix00
+tofix00  ## we addressed two of these in process_orgs_1
 
 update <- tofix0 %>%
   filter(type=='q11_1') %>%
   select(response_id, alter) %>%
-  rename(ego=alter) %>% 
+  rename(ego=alter) %>%  distinct() %>%
   left_join(tofix0 %>% filter(type != 'q11_1') %>% select(-ego)) %>%
   bind_rows(
     tofix00 %>% filter(ego_level=='q3_several_2') %>%
       mutate(ego_level='q3_individual_1') %>%
       filter(alter != ego) %>% distinct()
-      
-  )
+  ) %>% distinct()
 
 ## check
 update
@@ -169,6 +173,7 @@ q3q11_out %<>%
   bind_rows(update %>%
               pivot_wider(names_from='ego_level',values_from='ego') %>%
               mutate(org_name=q3_individual_1,multi_org=NA))
+
 if(write_out){  q3q11_out %>%
 write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_updateIND_4sen_',d.out,'.csv')))   }
 
@@ -185,10 +190,12 @@ rm(filtdat0,filtdat00,orgdat0,orgdat00)
 orgdat1 <- filter(orgdat, ego_level=='q3_individual_1' & !(response_id %in% update$response_id) & !grepl('Individual',ego))
 orgdat1_n <- length(unique(orgdat1$response_id))
 
+
 ## exact matches
 View(orgdat1 %>% filter(ego==alter))
+all(filter(orgdat1, ego==alter)$response_id %in% loc$response_id)  ## do all have county info provided? TRUE
 
-## filter for exact matches
+## filter for exact matches (all but 1)
 filtdat1 <- orgdat1 %>% filter(ego==alter) %>%
   group_by(response_id) %>%
   summarise(rc_or_g2kr=ifelse(ego %in% c("Reef Check","Giant Giant Kelp Restoration Project"), 1, 0)) %>%
@@ -236,7 +243,7 @@ if(write_out){   q3q11_out %>%
 #   write_csv(here('../california-kelp-SEN','data','survey','confidential',paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateONE_4sen_',Sys.Date(),'.csv')))
 
 
-#################################### stopped here 7/21 ####################################
+
 # 2+ ORGS: Exact Ego-Alter Match ------------------------------------------
 
 ## grab respondents who work on behalf of multiple orgs
@@ -261,7 +268,7 @@ filtdat2 <- orgdat2 %>% filter(ego==alter) %>%
   mutate(q3='two') 
 with(filtdat2, table(category))
 # exact-first ego exact-other ego 
-# 18              26 
+# 18              25 
 #   
 
 ## removing alters?
@@ -274,7 +281,7 @@ length(unique(tofix_alter$response_id)) #16
 ## remove ego IF second or later ego listed is also an exact match for an alter
 tofix_ego <- filter(filtdat2, category=='exact-other ego') %>%
   select(response_id) %>% distinct() %>% left_join(orgdat2)
-length(unique(tofix_ego$response_id)) #26
+length(unique(tofix_ego$response_id)) #25
 
 ## how many have both?
 sum(unique(tofix_alter$response_id) %in% unique(tofix_ego$response_id))  #14
@@ -285,7 +292,7 @@ tofix_alter %<>% filter(!response_id %in% tofix_both$response_id)
 tofix_ego %<>% filter(!response_id %in% tofix_both$response_id)
 length(unique(tofix_both$response_id)) #14
 length(unique(tofix_alter$response_id)) #2
-length(unique(tofix_ego$response_id)) #12
+length(unique(tofix_ego$response_id)) #11
 
 
 
@@ -347,7 +354,7 @@ update_ego2 <- update_ego %>% mutate(rmv_ego=case_when(
   response_id=='R_1GBVWsZocl0VprB' ~ NA,
   response_id=='R_1LY9bZGoDJpKr8U'~ NA,
   response_id=='R_1QxOFb6rcRAJfNj' & grepl('Davis',rmv_ego) ~ NA,
-  response_id=='R_1qyNTuTpApbsKrv' ~ NA,
+  # response_id=='R_1qyNTuTpApbsKrv' ~ NA,
   response_id=='R_5vldi5R3qII19F6' ~ NA,
   response_id=='R_7417rkzwocKka1y' ~ NA,
   response_id=='R_3iPGxjt8gAiTFfa' ~ NA,
@@ -357,7 +364,7 @@ update_ego2 <- update_ego %>% mutate(rmv_ego=case_when(
 
 View(update_ego2)
 
-update_alter2 <- filter(update_ego, response_id %in% c('R_1GBVWsZocl0VprB','R_1LY9bZGoDJpKr8U','R_1qyNTuTpApbsKrv',
+update_alter2 <- filter(update_ego, response_id %in% c('R_1GBVWsZocl0VprB','R_1LY9bZGoDJpKr8U',
                                                        'R_5vldi5R3qII19F6','R_7417rkzwocKka1y','R_3iPGxjt8gAiTFfa',
                                                        'R_51QOureZvOe4yuD'))  %>%
   bind_rows(filter(update_ego, response_id=='R_1QxOFb6rcRAJfNj' & grepl('Davis',rmv_ego)))%>%
@@ -589,8 +596,32 @@ q3q11_out %<>% filter(!(response_id %in% update_many_egos_wide$response_id)) %>%
 
 
 # DISES: Check other egos -------------------------------------------------
-## need to remove Santa Cruz for one individual
+## need to move UC Santa Cruz to collabs for one individual
+q3q11_out %<>% filter(response_id!='R_3ocCcrb6NY9Nk5I') %>%
+  bind_rows(
+    q3q11_out %>% filter(response_id=='R_3ocCcrb6NY9Nk5I') %>%
+      mutate(q3_individual_1=q3_several_1,
+             q3_several_2=NA,
+             multi_org=NA) %>% mutate(q3_several_1=NA)
+  )
+q3q11_out %<>% bind_rows(
+  q3q11_out %>% filter(response_id=='R_3ocCcrb6NY9Nk5I') %>%
+    slice_head(n=1) %>%
+    mutate(alter='University of California Santa Cruz')
+)
 
+## deal with last name spelling. and we removed some alters when we grabbed only the survey response by this individual (there were 2)
+##   that had >75% complete.
+q3q11_out %<>% mutate(recipient_last_name=ifelse(recipient_last_name=='Pomerory', 'Pomeroy', recipient_last_name))
+q3q11_out %<>% 
+  bind_rows(
+    q3q11_out %>% filter(recipient_last_name=='Pomeroy') %>%
+      slice_head(n=1) %>%
+      mutate(alter=expand_org_names_sub('Kelp Restoration as an Integrated Socio-Ecological System')) %>%
+      separate(alter,into=c('alt1','alt2','alt3','alt4','alt5','alt6','alt7','alt8','alt9'), sep=",") %>%
+      pivot_longer(starts_with('alt'), names_to='tmp', values_to='alter') %>% dplyr::select(-tmp) %>%
+      filter(!grepl('Pomeroy',alter))
+  )
 
 # Save --------------------------------------------------------------------
 

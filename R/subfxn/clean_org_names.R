@@ -158,6 +158,8 @@ clean_org_names <- function(x, collab = FALSE, return_original = FALSE){
       x=="Andrew Rassweiler, Florida State University" ~ "Florida State University: Andrew Rassweiler", 
       x=="FSU" ~ "Florida State University", 
       
+      x=="MBNMS, GFNMS/GFA, TNC, MLML, RCCA, SSU, Watermen's Alliance, G2KR, OPC" ~ expand_org_names_sub("MBNMS, GFNMS/GFA, TNC, MLML, RCCA, SSU, Watermen's Alliance, G2KR, OPC"),
+        
       grepl(paste0(c("GFNMS","Greater farallones",
                       "Greater Farralones",
                       "Gulf of the Farralons"),collapse="|"),x, ignore.case=TRUE) & 

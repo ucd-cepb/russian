@@ -362,7 +362,7 @@ q3_clean %<>% select(response_id, org_name, starts_with('q3')) %>%
 
 ## in russian
 q3_clean %>%
-  write_csv(here('data','sen',paste0('processed_by_responseID_orgs_4sen_',Sys.Date(),'.csv')))
+  write_csv(here('data','sen',paste0('processed_by_responseID_q3_orgs_4sen_',Sys.Date(),'.csv')))
 ## in SEN repo
 # q3_clean %>%
 #   write_csv(here('../','california-kelp-SEN','data','survey','confidential',

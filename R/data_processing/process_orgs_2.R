@@ -110,10 +110,10 @@ filter(question_11, is.na(clean_org_name))
 
 question_11 %<>% filter(!is.na(clean_org_name))
 
-length(unique(question_11$org_name)); length(unique(question_11$clean_org_name))
-sum(grepl("-",question_11$clean_org_name))  # how many have project/group names included? 54
+length(unique(question_11$org_name)); length(unique(question_11$clean_org_name))  # 402 unique answers reduced to 218
+sum(grepl("-",question_11$clean_org_name))  # how many have project/group names included? 53
 sum(grepl(":",question_11$clean_org_name))  # how many have individual names included? 173
-sum(grepl(",",question_11$clean_org_name))  # how many do we have to split into multiple rows? *(next section)* -- 9
+sum(grepl(",",question_11$clean_org_name))  # how many do we have to split into multiple rows? *(next section)* -- 10
 
 # Split multiple orgs -----------------------------------------------------
 ## where collaboratives were named (e.g., PISCO, DISES) or where someone listed multiple orgs or 
