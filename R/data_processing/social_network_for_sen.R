@@ -22,7 +22,7 @@
 #
 #
 # 7/23/2025 - Mary Fisher
-# Last edited: 9/25/2025
+# Last edited: 10/2/2025
 #
 #######################################################################
 
@@ -42,25 +42,34 @@ d.in <- '2025-09-23'
 # d.out <- Sys.Date()
 d.out <- d.in
 #
-# process_prefix <- 'updateINDupdateORG'
-process_prefix <- 'updateINDupdateORGmanEGO'
+# process_prefix <- 'updateINDupdateORGmanEGO'
+process_prefix <- 'updateINDupdateORGmanEGO2'
 
 
+# Data --------------------------------------------------------------------
+## this is the data frame from process_orgs_3
+dat <- read_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_',process_prefix,'_4sen_',d.out,'.csv')))
 
+## this is the survey data
+dat_survey <- read_csv(here('confidential_data','raw','kelp_jan.9.25_copy.csv'))  %>%
+  clean_names() %>%
+  slice(-c(1:2))
+dat_survey %<>% filter(as.numeric(progress) > 75)
+dim(dat_survey)  # 190
 
+dat$response_id[which(!(dat$response_id %in% dat_survey$response_id))]
 
 # Cross-check org names ---------------------------------------------------
 ## Revise organization names that don't match between alter / ego data.
 ## for the SEN, this includes org names that I made extra specific to help
 ## connect people to kelp administrative areas.
 
-all_egos <- unique(dat %>% dplyr::select(response_id,multi_org) %>%
-                     separate(multi_org, into=c('org1','org2','org3','org4','org5','org6'), sep=',') %>% 
-                     pivot_longer(starts_with('org'), names_to='org_level',values_to='org_name') %>%
+all_egos <- unique(dat %>% dplyr::select(-org_name) %>%
+                     pivot_longer(starts_with('q3'), names_to='org_level',values_to='org_name') %>%
                      filter(!is.na(org_name)) %>%
                      bind_rows(
                        dat %>%
-                         filter(!is.na(org_name) & is.na(multi_org)) %>% dplyr::select(response_id,org_name)
+                         filter(!is.na(org_name) & is.na(multi_org))
                      ) %>%
                      pull(org_name))
 
@@ -101,9 +110,10 @@ write_csv(all_orgs,here('data','sen',paste0('sn_match_ego_alter_organizations_',
 # data.frame(org_name=unique(c(all_egos,all_alters))) %>%
 #   write_csv(here('data','sen','sn_match_ego_alter_organizations_KEY.csv'))  ## this will overwrite existing key!!
 
-# Create social network ---------------------------------------------------
 
-# Create First Level Social Network ---------------------------------------
+
+
+# Create First Level Social Network! ---------------------------------------
 ## Data Res egos only ##
 dat_out <- dat
 dat_out %<>% filter(response_id %in% dat_lvl$response_id)
@@ -215,6 +225,7 @@ filter(el0, sn_org_name==el_add$sn_org_name[1])
 ## temporary save so we don't lose work
 write_csv(el0, here('data','sen',paste0('sn_datares_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
 
+
 # Create First Level Social Network: clean up duplicates --------------
 
 ## collapse the collab / shared personnel duplicates
@@ -275,7 +286,7 @@ sum(is.na(mat_out))
 #save
 saveRDS(mat_out, here('data','sen',paste0('sn_dataresRID_collab_multi_',process_prefix,'_MATRIX_4sen_',d.out,'.rds')))
 
-# Second Pass: all collaborations -----------------------------------------
+# Create Second Level Social Network! all collaborations -----------------------------------------
 ## No data res ##
 dat_out2 <- dat
 dat_out2 %<>% filter(!(response_id %in% dat_lvl$response_id))

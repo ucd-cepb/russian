@@ -278,7 +278,7 @@ if(write_out){   dat_out %>%
     write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_',process_prefix,'2_4sen_',d.out,'.csv')))    }
 
 
-#################################### stopped here 10/1 ###########################
+
 # 2+ ORGS: Exact Ego-Alter Match ------------------------------------------
 
 ## grab respondents who work on behalf of multiple orgs
@@ -293,7 +293,7 @@ View(orgdat2 %>% filter(ego==alter) %>%
        mutate(category=ifelse(ego_level=='q3_several_1', 'exact-first ego','exact-other ego')))
 
 
-## filter for exact matches
+## identify exact matches
 filtdat2a <- orgdat2 %>% filter(ego==alter) %>%
   mutate(category=ifelse(ego_level=='q3_several_1', 'exact-first ego','exact-other ego')) 
 
@@ -309,27 +309,140 @@ filtdat2 <- filtdat2a %>%
 with(filtdat2, table(category))  ## 19 exact first, 12 exact other
 
 
-#########################################################
-
-## there are more alters than the ones that are also egos: remove all alters
+## there are more alters than the ones that are also egos: remove all alters ##
 tofix_alter1 <- filter(filtdat2, n_alter > n_alter_an_ego) %>%
   select(response_id) %>% distinct() %>% left_join(orgdat2) %>% distinct()
 length(unique(tofix_alter1$response_id)) #11
 
-## all alters are egos: remove all but first ego (to keep in network)
+dim(tofix_alter1)
+
+update_alter1 <- tofix_alter1 %>% 
+  ## identify which alters match to egos using the 'category' column from filtdat2a
+  left_join(dplyr::select(filtdat2a,response_id,alter,category) %>% distinct(), by=c('response_id','alter')) %>%
+  filter(is.na(category))
+
+dim(update_alter1) ## 147 to 108 rows
+update_alter1 %>% filter(ego==alter) ## should be 0!
+
+## get distinct alters, renumber them. 
+update_alter1 %<>% pivot_wider(names_from=ego_level, values_from=ego) %>% 
+  dplyr::select(-type) %>% distinct() %>% 
+  group_by(response_id) %>%
+  mutate(type=paste0('q11_',seq(1:n())))
+
+## remove extra columns. 
+update_alter1 %<>% ungroup() %>% dplyr::select(colnames(dat_out)[which(colnames(dat_out) %in% colnames(update_alter1))])
+## check alter renumbering
+# update_alter1
+
+## replace data in output data frame
+dat_out %<>% filter(!(response_id %in% update_alter1$response_id)) %>%
+  bind_rows(
+    update_alter1
+  )
+
+## all alters are egos: remove all but first alter (to keep in network) ##
 tofix_alter2 <- filter(filtdat2, n_alter==n_alter_an_ego) %>%
   select(response_id) %>% distinct() %>% left_join(orgdat2)
 length(unique(tofix_alter2$response_id)) #10
 
 
+update_alter2 <- tofix_alter2 %>% 
+  ## identify which alters match to egos using the 'category' column from filtdat2a
+  left_join(dplyr::select(filtdat2a,response_id,alter,category) %>% distinct(), by=c('response_id','alter')) %>%
+  filter(category=='exact-first ego')
+
+dim(update_alter2); dim(tofix_alter2) ## 49 to 23
+
+## make sure we didn't lose any respondents
+all(update_alter2$response_id %in% tofix_alter2$response_id)
+
+## get distinct alters, renumber them. 
+update_alter2 %<>% pivot_wider(names_from=ego_level, values_from=ego) %>% 
+  dplyr::select(-type) %>% distinct() %>% 
+  group_by(response_id) %>%
+  mutate(type=paste0('q11_',seq(1:n())))
+
+## remove extra columns. 
+update_alter2 %<>% ungroup() %>% dplyr::select(colnames(dat_out)[which(colnames(dat_out) %in% colnames(update_alter1))])
 
 
 
+## replace data in output data frame
+dat_out %<>% filter(!(response_id %in% update_alter2$response_id)) %>%
+  bind_rows(
+    update_alter2
+  )
 
 
+## who is left? 
+filtdat2 %<>% filter(!response_id %in% c(update_alter1$response_id, update_alter2$response_id))
+filtdat2
 
 
+# 2+ ORGS: Duplicate Alters ------------------------------------------
+## get duplicated alters (happened because we removed individual names)
+filtdat3 <- dat_out %>% group_by(response_id,alter) %>% mutate(n=n()) %>%
+  filter(n>1)
 
+## how many rows in the original data for this group of respondents?
+update_alter3 <- dat_out %>% filter(response_id %in% filtdat3$response_id) 
+dim(update_alter3) #121
+
+## remove duplicates, renumber alter 'type' column
+update_alter3 %<>% dplyr::select(-type) %>% distinct() %>%
+  group_by(response_id) %>%
+  mutate(type=paste0('q11_',seq(1:n()))) %>% ungroup()
+
+dim(update_alter3) # 89
+
+## replace data in output data frame
+dat_out %<>% filter(!(response_id %in% update_alter3$response_id)) %>%
+  bind_rows(
+    update_alter3
+  )
+
+
+# 2+ ORGS: Similar Ego-Alter ------------------------------------------
+## for individuals with more than one alter, is the alter name contained within the ego name?
+##   checking this because egos can contain project names (e.g., Cal Poly Humboldt "kelp culture" v "nereo")
+##   while alters may not. 
+filtdat4 <- dat_out %>%
+  pivot_longer(starts_with('q3'), names_to='ego_level',values_to='ego') %>% filter(!is.na(ego)) %>%
+    group_by(response_id) %>% mutate(n_alter=length(unique(alter))) %>%
+    ## we don't want to remove these alters if they're the only one attached to the respondent. 
+    filter(n_alter>1) %>% ungroup() %>%
+  rowwise() %>%
+  filter(grepl(alter,ego))
+
+## exclude MLML v. MLML - SSL
+filtdat4 %<>% filter(ego != 'Moss Landing Marine Laboratories - Sunflower Star Laboratory')
+length(unique(filtdat4$response_id))
+
+## investigate Cal Poly Humboldt by bringing back any individual names
+View( dat %>% filter(response_id %in% filtdat4$response_id) %>%
+  dplyr::select(response_id,alter) %>% separate(alter, into=c('alter','alter_ind'),sep=':') %>%
+  distinct() %>% filter(alter %in% filtdat4$alter) )
+
+##still remove: R_3uHTLrh3ea49nmF (non-specific); R_1LY9bZGoDJpKr8U (in same group); R_59T9thuNU6T04lX (non-specific);
+## R_5rju7W12HtPajKX (non-specific and duplicated?); R_7PSlOsSbZJnSQVt (non-specific)
+
+## how many rows in the original data for this group of respondents?
+update_alter4 <- dat_out %>% filter(response_id %in% filtdat4$response_id) 
+dim(update_alter4) #45
+
+## remove duplicates, renumber alter 'type' column
+update_alter4 %<>% anti_join(filtdat4) %>%
+  dplyr::select(-type) %>% distinct() %>%
+  group_by(response_id) %>%
+  mutate(type=paste0('q11_',seq(1:n()))) %>% ungroup()
+dim(update_alter4) #39
+
+## replace data in output data frame
+dat_out %<>% filter(!(response_id %in% update_alter4$response_id)) %>%
+  bind_rows(
+    update_alter4
+  )
 
 
 
@@ -338,4 +451,5 @@ length(unique(tofix_alter2$response_id)) #10
 if(write_out){   dat_out %>%
     write_csv(here('confidential_data','processed',paste0('processed_by_responseID_q3orgs_q11collabs_',process_prefix,'2_4sen_',d.out,'.csv')))    }
 
-
+if(write_out){   dat_out %>% dplyr::select(-starts_with('recipient'), -email) %>%
+    write_csv(here('data','sen',paste0('processed_by_responseID_q3orgs_q11collabs_',process_prefix,'2_4sen_',d.out,'.csv')))    }

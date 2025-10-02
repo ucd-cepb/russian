@@ -49,7 +49,7 @@ question_11 <- dat_survey %>%
 question_11 %<>% filter(!is.na(org_name))
 
 
-# clean_org_names: first run ------------------------------------------
+# clean_org_names: ONLY FOR FIRST FUN OF SCRIPT ------------------------------------------
 ## use custom R function to adjust the names of organizations.
 
 question_11 %<>% mutate(clean_org_name=clean_org_names(org_name, collab=TRUE))
