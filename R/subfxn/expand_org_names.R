@@ -37,7 +37,7 @@ expand_org_names <- function() {
     bind_rows(dises_to_add %>% mutate(new_org='University of California Davis: Marissa Baskett')) %>%
     bind_rows(dises_to_add %>% mutate(new_org='University of California Davis: Tyler Scott')) %>%
     bind_rows(dises_to_add %>% mutate(new_org='University of California Davis: Mike Springborn')) %>%
-    bind_rows(dises_to_add %>% mutate(new_org='University of California Davis: John Largier')) %>%
+    bind_rows(dises_to_add %>% mutate(new_org='University of California Davis - Bodega Marine Laboratory: John Largier')) %>%
     bind_rows(dises_to_add %>% mutate(new_org='University of California Santa Cruz: Mark Carr')) %>%
     bind_rows(dises_to_add %>% mutate(new_org='University of California Santa Cruz: Carrie Pomeroy'))%>%
     bind_rows(dises_to_add %>% mutate(new_org='California State Polytechnic University Humboldt: Sean Craig'))%>%
