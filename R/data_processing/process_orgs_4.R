@@ -50,9 +50,6 @@ dim(dat_survey)  # 190
 dat$response_id[which(!(dat$response_id %in% dat_survey$response_id))] # zero!
 
 
-## direct observers
-dat_lvl <- read_csv(here('confidential_data','processed','datares_by_responseID_wCounty_2025-09-23.csv'))
-
 
 # Create survey respondent ID key -----------------------------------------
 
@@ -222,16 +219,25 @@ View(dat) ## search for "Jon" and "Bush"
 
 ## now that we've used individual names to adjust the social network data set, 
 ##  remove them from the alter column
-##  and re-check to make sure that organizations listed as egos aren't also 
+##  EXCEPT for individual divers, artists. 
+##  then re-check to make sure that organizations listed as egos aren't also 
 ##  listed as alters. 
 ## this doesn't remove ties from the SEN's social network, because 'collaboration' ties
 ## include shared personnel.
 
 dat_out <- dat
 
-dat_out %<>% separate(alter, into=c('alter','alter_ind'),sep=':') %>% dplyr::select(-alter_ind)
+dat_out %<>% separate(alter, into=c('alter','alter_ind'),sep=':')
 
+## assign numbers to alters named as individuals
+dat_out %<>% filter(!alter %in% c('Commercial Diver','Artist','Photographer')) %>%
+  bind_rows(
+    filter(dat_out, alter %in% c('Commercial Diver','Artist','Photographer')) %>%
+  group_by(alter) %>% mutate(alter=paste0(alter,' ',seq(1:n()))) %>%
+    ungroup()
+  ) %>% arrange(response_id,alter)
 
+dat_out %<>% dplyr::select(-alter_ind)
 
 # ONE EGO ORG: Exact Ego-Alter match ----------------------------------
 
@@ -306,7 +312,7 @@ filtdat2 <- filtdat2a %>%
   group_by(response_id, n_ego, category) %>%
   summarise(n_alter=length(unique(alter)),
             n_alter_an_ego=sum(alter_an_ego,na.rm=TRUE)) 
-with(filtdat2, table(category))  ## 19 exact first, 12 exact other
+with(filtdat2, table(category))  ## 18 exact first, 12 exact other
 
 
 ## there are more alters than the ones that are also egos: remove all alters ##
@@ -387,14 +393,14 @@ filtdat3 <- dat_out %>% group_by(response_id,alter) %>% mutate(n=n()) %>%
 
 ## how many rows in the original data for this group of respondents?
 update_alter3 <- dat_out %>% filter(response_id %in% filtdat3$response_id) 
-dim(update_alter3) #121
+dim(update_alter3) #102
 
 ## remove duplicates, renumber alter 'type' column
 update_alter3 %<>% dplyr::select(-type) %>% distinct() %>%
   group_by(response_id) %>%
   mutate(type=paste0('q11_',seq(1:n()))) %>% ungroup()
 
-dim(update_alter3) # 89
+dim(update_alter3) # 76
 
 ## replace data in output data frame
 dat_out %<>% filter(!(response_id %in% update_alter3$response_id)) %>%

@@ -72,7 +72,7 @@ expand_org_names_sub <- function(x){
   } else if(x=='PISCO'){
     return("Partnership for Interdisciplinary Studies of Coastal Oceans,Oregon State University,Stanford University - Hopkins Marine Station,University of California Santa Barbara,University of California Santa Cruz")
   } else if(x=='Kelp Restoration as an Integrated Socio-Ecological System'){
-    return('University of California Davis - Kelp Restoration as an Integrated Socio-Ecological System,University of California Davis: Marissa Baskett,University of California Davis: Tyler Scott,University of California Davis: Mike Springborn,University of California Davis: John Largier,University of California Santa Cruz: Carrie Pomeroy,University of California Santa Cruz: Mark Carr,California State Polytechnic University Humboldt: Sean Craig,California State Polytechnic University Humboldt: Laurie Richmond')
+    return('University of California Davis - Kelp Restoration as an Integrated Socio-Ecological System,University of California Davis: Marissa Baskett,University of California Davis: Tyler Scott,University of California Davis: Mike Springborn,University of California Davis - Bodega Marine Laboratory: John Largier,University of California Santa Cruz: Carrie Pomeroy,University of California Santa Cruz: Mark Carr,California State Polytechnic University Humboldt: Sean Craig,California State Polytechnic University Humboldt: Laurie Richmond')
   } else if(x=='Ocean Protection Council; Greater Farallones Assoc.'){
     return("California Ocean Protection Council,Greater Farallones Assoc and NMS")
   }else if(x=="MBNMS, GFNMS/GFA, TNC, MLML, RCCA, SSU, Watermen's Alliance, G2KR, OPC"){

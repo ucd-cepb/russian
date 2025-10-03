@@ -1,6 +1,6 @@
 ############### Create social network for kelp SEN ############### 
 #
-# Take the output from the script `process_orgs_3.R` and make sure 
+# Take the output from the script `process_orgs_4.R` and make sure 
 #    that organization names cross-ref each other, between 
 #    egos and alters. 
 # Alters are collaborators
@@ -38,7 +38,7 @@ library(magrittr)
 library(janitor)
 library(igraph)
 #
-d.in <- '2025-09-23'
+d.in <- '2025-10-01'
 # d.out <- Sys.Date()
 d.out <- d.in
 #
@@ -59,38 +59,39 @@ dim(dat_survey)  # 190
 
 dat$response_id[which(!(dat$response_id %in% dat_survey$response_id))]
 
+## direct observers
+dat_lvl <- read_csv(here('confidential_data','processed','datares_by_responseID_wCounty_2025-09-23.csv'))
+
+
 # Cross-check org names ---------------------------------------------------
 ## Revise organization names that don't match between alter / ego data.
 ## for the SEN, this includes org names that I made extra specific to help
 ## connect people to kelp administrative areas.
 
-all_egos <- unique(dat %>% dplyr::select(-org_name) %>%
+all_egos <- unique(dat %>% filter(!is.na(multi_org)) %>% dplyr::select(-org_name) %>%
+                     ## first the multiple affiliates
                      pivot_longer(starts_with('q3'), names_to='org_level',values_to='org_name') %>%
                      filter(!is.na(org_name)) %>%
                      bind_rows(
+                       ## then on behalf of
                        dat %>%
                          filter(!is.na(org_name) & is.na(multi_org))
                      ) %>%
                      pull(org_name))
 
-length(all_egos)
+length(all_egos) ##99
 
-all_alters <- dat %>% dplyr::select(response_id,alter) %>%
-                       separate(alter,into=c('alter','alter_ind'), sep=':')
-
-all_alters %<>% filter(!(alter %in% c('Commercial Diver','Artist','Photographer'))) %>% bind_rows(
-  all_alters %>% filter(alter %in% c('Commercial Diver','Artist','Photographer')) %>%
-    unite('alter',alter, alter_ind, sep=':'))
+all_alters <- dat %>% dplyr::select(response_id,alter) %>%  distinct()
 
 all_alters <- unique(filter(all_alters,!is.na(alter)) %>% pull(alter))
-length(all_alters)
+length(all_alters) ##151
 
 
 all_egos
 all_alters
 
 
-## there are multiple project / lab names in the same organization.
+## there are multiple project / lab names in the same organization. we don't have alter data to that level always
 all_orgs <- data.frame(egos_full_name=all_egos) %>%
   separate(egos_full_name, into=c('org_name','ego_subgroup'), sep=' - ',remove=FALSE) %>%
   mutate(ego=1) %>%
@@ -112,6 +113,7 @@ write_csv(all_orgs,here('data','sen',paste0('sn_match_ego_alter_organizations_',
 
 
 
+############################# Create First Level Social Network  #############################
 
 # Create First Level Social Network! ---------------------------------------
 ## Data Res egos only ##
@@ -120,7 +122,7 @@ dat_out %<>% filter(response_id %in% dat_lvl$response_id)
 
 # Create First Level Social Network: clean up names -----------------------
 ## read in names key
-key <- readxl::read_excel(here('data','sen',paste0('sn_match_ego_alter_organizations_',d.out,'_KEY.xlsx')), sheet='key')
+key <- readxl::read_excel(here('data','sen',paste0('sn_match_ego_alter_organizations_2025-09-23_KEY.xlsx')), sheet='key')
 head(key)
 
 ## melt out data frame so that each 'ego' organization gets one row
@@ -135,9 +137,6 @@ any(filter(dat_out,ego_level=='q3_several_1')$org_name != filter(dat_out,ego_lev
 
 # apply re-naming to 'dat' dataframe. make sure we get all orgs for multi org respondents
 dat_out %<>% dplyr::select(-org_name) %>%
-  separate(alter, into=c('alter','alter_ind'), sep=':') %>%
-  ## we need to keep names attached to artists, divers named as individuals
-  mutate(alter=ifelse(alter %in% c('Commercial Diver','Artist'), paste0(alter, ':', alter_ind),alter)) %>%
   ## new names for egos
   left_join(key, by=c('ego'='org_name')) %>%
   ## new names for alters
@@ -170,13 +169,9 @@ dat_out %<>% filter(response_id != 'R_50f07NmTN6tehhY') %>%
               mutate(ego='University of California Davis - Bodega Marine Laboratory', 
                      sn_org_name='University of California Davis - Bodega Marine Laboratory',
                      multi_org=str_replace(multi_org,'University of California Davis','University of California Davis - Bodega Marine Laboratory')))
-dat_out %<>% 
-  mutate(alter_ind=str_trim(alter_ind)) %>%
-  mutate(sn_alter=ifelse(alter=='University of California Davis' & alter_ind=='John Largier','University of California Davis - Bodega Marine Laboratory',sn_alter))
 
 ## save as data frame
-write_csv(dat_out, here('confidential_data','processed',paste0('sn_datares_',process_prefix, '_',d.out,'_4sen.csv')))
-
+write_csv(dat_out, here('confidential_data','processed',paste0('sn_dataresRID_',process_prefix, '_',d.out,'_4sen.csv')))
 
 # Create First Level Social Network: df as edge list --------------
 
@@ -184,7 +179,7 @@ write_csv(dat_out, here('confidential_data','processed',paste0('sn_datares_',pro
 el0 <- dat_out %>% group_by(sn_org_name,sn_org_scale,sn_org_type,sn_alter,sn_alter_scale,sn_alter_type) %>%
   summarise(r=length(unique(response_id))) %>% mutate(tie='collab')
 ## remove self-ties
-el0 %<>% filter(sn_org_name != sn_alter)
+# el0 %<>% filter(sn_org_name != sn_alter)
 
 
 expand_unique <- function(x){
@@ -220,25 +215,27 @@ all(colnames(el_add) %in% colnames(el0))
 el0 %<>% bind_rows(el_add %>% ungroup() %>% dplyr::select(-org_name,-alter) %>% mutate(tie='shared_personnel'))
 
 ## look up one multiple affiliate - THERE MAY BE INVERSE DUPLICATES IN THIS EDGE LIST. 
-filter(el0, sn_org_name==el_add$sn_org_name[1])
+View(  filter(el0, sn_org_name==el_add$sn_org_name[1])  )
+View(  filter(el0, sn_org_name==el_add$sn_org_name[18])  )
 
 ## temporary save so we don't lose work
-write_csv(el0, here('data','sen',paste0('sn_datares_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
+write_csv(el0, here('data','sen','networks',paste0('sn_dataresRID_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
 
 
 # Create First Level Social Network: clean up duplicates --------------
 
 ## collapse the collab / shared personnel duplicates
 el_4graph <- el0 %>% group_by(sn_org_name,sn_org_scale,sn_org_type,sn_alter,sn_alter_scale,sn_alter_type) %>%
-  summarise(r=sum(r), tie=paste0(unique(tie),collapse=','))
-dim(el0); dim(el_4graph)  ## 440 to 425
+  summarise(r=sum(r), tie=paste0(unique(tie),collapse=',')) %>% distinct() %>%
+  filter(!is.na(sn_alter))
+dim(el0); dim(el_4graph)  ## 445 to 427
 
 ## create and simplify a graph in which the edge attribute is the number of responses
-g1 <- graph_from_edgelist(cbind(el_4graph$sn_org_name, el_4graph$sn_alter), directed=FALSE)
+g1 <- igraph::graph_from_edgelist(el=cbind(el_4graph$sn_org_name, el_4graph$sn_alter), directed=FALSE)
 g1; is_simple(g1)
 E(g1)$r <- el_4graph$r  # add edge attribute
 g2 <- simplify(g1, remove.multiple = TRUE, remove.loops = TRUE, edge.attr.comb = 'sum')
-g2; is_simple(g2)  ## down to 359 from 424
+g2; is_simple(g2)  ## down to 358 from 427
 E(g2)$r
 el_outr <- igraph::as_data_frame(g2,what='edges')
 
@@ -247,16 +244,16 @@ g1 <- graph_from_edgelist(cbind(el_4graph$sn_org_name, el_4graph$sn_alter), dire
 g1; is_simple(g1)
 E(g1)$type <- el_4graph$tie # add edge attribute
 g2 <- simplify(g1, remove.multiple = TRUE, remove.loops = TRUE, edge.attr.comb = 'concat')
-g2; is_simple(g2)  ## down to 359 from 424
+g2; is_simple(g2)  ## down to 358 from 424
 E(g2)$type
 el_outt0 <- igraph::as_data_frame(g2,what='edges')
 el_outt1 <- el_outt0 %>% group_by(from,to) %>% summarise(tie=paste0(unique(unlist(type)),collapse=','))
 el_outt <- el_outt1 %>% group_by(from,to) %>% mutate(tie=paste0(unique(unlist(str_split(tie,',')[[1]])),collapse=','))
 
-filter(el_outt, from==el_outt0[1,'from'])
-filter(el_outt0, from==el_outt0[1,'from'])
-filter(el_outt, from==el_outt0[46,'from'])
-filter(el_outt0, from==el_outt0[46,'from'])
+# filter(el_outt, from==el_outt0[1,'from'])
+# filter(el_outt0, from==el_outt0[1,'from'])
+# filter(el_outt, from==el_outt0[46,'from'])
+# filter(el_outt0, from==el_outt0[46,'from'])
 
 rm(el_outt0, el_outt1)
 
@@ -265,26 +262,42 @@ head(el_outt); head(el_outr)
 el_out <- left_join(el_outr,el_outt, by=c('from','to'))
 head(el_out)
 
+
+## ANY ISOLATES missing entirely?
+el0 %>% filter(is.na(sn_alter) & !(sn_org_name %in% c(el_out$from,el_out$to)))
+
+
+
 ## save over file above
-write_csv(el_out, here('data','sen',paste0('sn_datares_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
+write_csv(el_out, here('data','sen','networks',paste0('sn_dataresRID_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
 
 
-## as matrix
-mat_out <- el_out %>% dplyr::select(-tie) %>%
-  #zeros v. missing data: start by making everyone that is blank NA
-  pivot_wider(id_cols=from,names_from=to,values_from=r) %>%
-  pivot_longer(cols=2:(length(unique(el_out$to))+1),names_to='to',values_to='r') %>%
-  #if either actor in the pair was in our dat_out data frame as an ego, switch NA to 0
-  mutate(r=ifelse(is.na(r) & (from %in% dat_out$sn_org_name | to %in% dat_out$sn_org_name),0,r)) %>%
-  #pivot wider into a matrix again
-  pivot_wider(id_cols=from,names_from=to,values_from=r) %>%
-  column_to_rownames('from')
+## create and save node attributes (number of survey respondents per actor; scale; type)
+natt <- data.frame(sn_org_name=unique(c(el_out$from,el_out$to))) %>%
+  left_join(dat_out %>%
+              mutate(has_alter=ifelse(is.na(alter),0,1)) %>%
+              group_by(sn_org_name,sn_org_scale,sn_org_type,has_alter) %>% 
+              summarise(r=length(unique(response_id))), by=c('sn_org_name'))
+natt %<>% filter(!is.na(r)) %>% mutate(alter_only=0) %>%
+  bind_rows(
+    natt %>% filter(is.na(r)) %>% dplyr::select(sn_org_name) %>% mutate(has_alter=1, alter_only=1) %>%
+      left_join(dat_out %>%
+                  dplyr::select(response_id, sn_alter,sn_alter_scale,sn_alter_type) %>%
+                  rename(sn_org_name=sn_alter,sn_org_scale=sn_alter_scale,sn_org_type=sn_alter_type) %>%
+                  distinct() %>%
+                  group_by(sn_org_name,sn_org_scale,sn_org_type) %>% 
+                  summarise(r=length(unique(response_id))) %>% filter(!is.na(sn_org_name)))
+  )
 
-sum(mat_out==0,na.rm=TRUE)
-sum(is.na(mat_out))
+write_csv(natt, here('data','sen','networks',paste0('sn_dataresRID_collab_multi_',process_prefix,'_NODEATT_4sen_',d.out,'.csv')))
 
-#save
-saveRDS(mat_out, here('data','sen',paste0('sn_dataresRID_collab_multi_',process_prefix,'_MATRIX_4sen_',d.out,'.rds')))
+
+
+
+
+
+############################# Create SECOND Level Social Network  #############################
+
 
 # Create Second Level Social Network! all collaborations -----------------------------------------
 ## No data res ##
@@ -293,7 +306,7 @@ dat_out2 %<>% filter(!(response_id %in% dat_lvl$response_id))
 
 # Create Second Level Social Network: clean up names -----------------------
 ## read in names key
-key <- readxl::read_excel(here('data','sen',paste0('sn_match_ego_alter_organizations_',d.out,'_KEY.xlsx')), sheet='key')
+key <- readxl::read_excel(here('data','sen',paste0('sn_match_ego_alter_organizations_2025-09-23_KEY.xlsx')), sheet='key')
 head(key)
 
 ## melt out data frame so that each 'ego' organization gets one row
@@ -309,9 +322,6 @@ any(filter(dat_out2,ego_level=='q3_several_1')$org_name != filter(dat_out2,ego_l
 
 # apply re-naming to 'dat' dataframe. make sure we get all orgs for multi org respondents
 dat_out2 %<>% dplyr::select(-org_name) %>%
-  separate(alter, into=c('alter','alter_ind'), sep=':') %>%
-  ## we need to keep names attached to artists, divers named as individuals
-  mutate(alter=ifelse(alter %in% c('Commercial Diver','Artist','Photographer'), paste0(alter, ':', alter_ind),alter)) %>%
   ## new names for egos
   left_join(key, by=c('ego'='org_name')) %>%
   ## new names for alters
@@ -341,14 +351,13 @@ any(is.na(filter(dat_out2, !is.na(alter))$sn_alter))
 write_csv(dat_out2, here('confidential_data','processed',paste0('sn_level2_',process_prefix, '_',d.out,'_4sen.csv')))
 
 
-
 # Create Second Level Social Network: df as edge list --------------
 
 ## first, do collabs
 el0 <- dat_out2 %>% group_by(sn_org_name,sn_org_scale,sn_org_type,sn_alter,sn_alter_scale,sn_alter_type) %>%
   summarise(r=length(unique(response_id))) %>% mutate(tie='collab')
 ## remove self-ties
-el0 %<>% filter(sn_org_name != sn_alter)
+# el0 %<>% filter(sn_org_name != sn_alter)
 
 
 expand_unique <- function(x){
@@ -386,22 +395,23 @@ el0 %<>% bind_rows(el_add %>% ungroup() %>% dplyr::select(-org_name,-alter) %>% 
 ## look up one multiple affiliate - THERE MAY BE INVERSE DUPLICATES IN THIS EDGE LIST. 
 filter(el0, sn_org_name==el_add$sn_org_name[1])
 
-## temporary save so we don't lose work
-write_csv(el0, here('data','sen',paste0('sn_level2_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
+## TEMPORARY save so we don't lose work
+write_csv(el0, here('data','sen','networks',paste0('sn_level2RID_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
 
 # Create Second Level Social Network: clean up duplicates --------------
 
 ## collapse the collab / shared personnel duplicates
 el_4graph <- el0 %>% group_by(sn_org_name,sn_org_scale,sn_org_type,sn_alter,sn_alter_scale,sn_alter_type) %>%
-  summarise(r=sum(r), tie=paste0(unique(tie),collapse=','))
-dim(el0); dim(el_4graph)  ## 161 to 159
+  summarise(r=sum(r), tie=paste0(unique(tie),collapse=','))%>% distinct() %>%
+  filter(!is.na(sn_alter))
+dim(el0); dim(el_4graph)  ## 182 to 160
 
 ## create and simplify a graph in which the edge attribute is the number of responses
 g1 <- graph_from_edgelist(cbind(el_4graph$sn_org_name, el_4graph$sn_alter), directed=FALSE)
 g1; is_simple(g1)
 E(g1)$r <- el_4graph$r  # add edge attribute
 g2 <- simplify(g1, remove.multiple = TRUE, remove.loops = TRUE, edge.attr.comb = 'sum')
-g2; is_simple(g2)  ## down to 147 from 159
+g2; is_simple(g2)  ## down to 147 from 160
 E(g2)$r
 el_outr <- igraph::as_data_frame(g2,what='edges')
 
@@ -428,29 +438,48 @@ head(el_outt); head(el_outr)
 el_out <- left_join(el_outr,el_outt, by=c('from','to'))
 head(el_out)
 
+
+## ANY ISOLATES missing entirely?
+el0 %>% filter(is.na(sn_alter) & !(sn_org_name %in% c(el_out$from,el_out$to)))
+
+el_out %<>% bind_rows(
+  el0 %>% filter(is.na(sn_alter) & !(sn_org_name %in% c(el_out$from,el_out$to))) %>%
+    ungroup() %>%
+    dplyr::select(sn_org_name,sn_alter,r,tie) %>% rename(from=sn_org_name,to=sn_alter)
+)
+
+
 ## save over file above
-write_csv(el_out, here('data','sen',paste0('sn_level2RID_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
+write_csv(el_out, here('data','sen','networks',paste0('sn_level2RID_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
 
 
-## as matrix
-mat_out <- el_out %>% dplyr::select(-tie) %>%
-  #zeros v. missing data: start by making everyone that is blank NA
-  pivot_wider(id_cols=from,names_from=to,values_from=r) %>%
-  pivot_longer(cols=2:(length(unique(el_out$to))+1),names_to='to',values_to='r') %>%
-  #if either actor in the pair was in our dat_out data frame as an ego, switch NA to 0
-  mutate(r=ifelse(is.na(r) & (from %in% dat_out2$sn_org_name | to %in% dat_out2$sn_org_name),0,r)) %>%
-  #pivot wider into a matrix again
-  pivot_wider(id_cols=from,names_from=to,values_from=r) %>%
-  column_to_rownames('from')
+## create and save node attributes (number of survey respondents per actor; scale; type)
+natt <- data.frame(sn_org_name=unique(c(el_out$from,el_out$to))) %>%
+  left_join(dat_out2 %>%
+              mutate(has_alter=ifelse(is.na(alter),0,1)) %>%
+              group_by(sn_org_name,sn_org_scale,sn_org_type,has_alter) %>% 
+              summarise(r=length(unique(response_id))), by=c('sn_org_name'))
+natt %<>% filter(!is.na(r)) %>% mutate(alter_only=0) %>%
+  bind_rows(
+    natt %>% filter(is.na(r)) %>% dplyr::select(sn_org_name) %>% mutate(has_alter=1, alter_only=1) %>%
+      left_join(dat_out2 %>%
+                  dplyr::select(response_id, sn_alter,sn_alter_scale,sn_alter_type) %>%
+                  rename(sn_org_name=sn_alter,sn_org_scale=sn_alter_scale,sn_org_type=sn_alter_type) %>%
+                  distinct() %>%
+                  group_by(sn_org_name,sn_org_scale,sn_org_type) %>% 
+                  summarise(r=length(unique(response_id))) %>% filter(!is.na(sn_org_name)))
+  )
 
-sum(mat_out==0,na.rm=TRUE)  ## 2322
-sum(is.na(mat_out)) ##195
-
-#save
-saveRDS(mat_out, here('data','sen',paste0('sn_level2RID_collab_multi_',process_prefix,'_MATRIX_4sen_',d.out,'.rds')))
+write_csv(natt, here('data','sen','networks',paste0('sn_level2RID_collab_multi_',process_prefix,'_NODEATT_4sen_',d.out,'.csv')))
 
 
 
+
+
+
+
+
+############################# Create COMBINED Social Network  #############################
 
 # Combined social network edgelist ----------------------------------------
 ## read in both edge lists.
@@ -470,7 +499,7 @@ dat_org_lvl %<>% rename(orig_org_name=ego) %>%
 )
 
 # write_csv(dat_org_lvl, here('data','sen',paste0('field_key_level1_egos_alters_',d.out,'.csv')))
-l1key <-  readxl::read_excel(here('data','sen',paste0('field_key_level1_egos_alters_',d.out,'_KEY.xlsx')),sheet='KEY')
+l1key <-  readxl::read_excel(here('data','sen',paste0('field_key_level1_egos_alters_2025-09-23_KEY.xlsx')),sheet='KEY')
 l1key %<>% mutate(in_field=ifelse(in_field==0,2,in_field))
 
 ## identify actors / organizations that should be considered "level 1" and those that are exclusively "level 2"
@@ -497,6 +526,10 @@ el_final %<>% group_by(from,from_lvl,to,to_lvl) %>%
   summarise(r=sum(r),
             tie=paste0(unique(tie),collapse=','))
 dim(el_final)
+
+## there will still be inverse duplicates in this data set, 
+##   but the respondent counts are correct with changes to process_orgs_4.
+View(filter(el_final, grepl('Berkeley',from), grepl('Berkeley',to)))   # two level 1 respondents linked to kashia band, one level 2
 
 
 ## save 
