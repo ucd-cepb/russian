@@ -34,6 +34,7 @@ fill_adjacency_matrix_with_missing_data <- function(el, missing_data, self=FALSE
     
     # vector of egos / alters
     all_a <- unique(c(el$from,el$to))
+    all_a <- all_a[which(!is.na(all_a))]
     
     # create a matrix; fill empty elements with zeros
     el2 <- el %>%
@@ -112,6 +113,7 @@ fill_adjacency_matrix_with_missing_data <- function(el, missing_data, self=FALSE
     
     # vector of egos / alters
     all_a <- unique(c(el$from,el$to))
+    all_a <- all_a[which(!is.na(all_a))]
     
     # create a matrix; fill empty elements with zeros
     el2 <- el %>%

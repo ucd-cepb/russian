@@ -38,6 +38,8 @@ library(magrittr)
 library(janitor)
 library(igraph)
 #
+source(here('R','subfxn','fill_adjacency_matrix_with_missing_data.R'))
+#
 d.in <- '2025-10-01'
 # d.out <- Sys.Date()
 d.out <- d.in
@@ -537,10 +539,10 @@ write_csv(el_final, here('data','sen','networks',paste0('sn_ALLties_collab_multi
 
 # Combined social network adjacency matrix --------------------------------
 
-dat_out <- read_csv(here('confidential_data','processed',paste0('sn_datares_',process_prefix, '_',d.out,'_4sen.csv')))
-dat_out2 <- read_csv(here('confidential_data','processed',paste0('sn_level2_',process_prefix, '_',d.out,'_4sen.csv')))
+dat_out <- read_csv(here('confidential_data','processed',paste0('sn_dataresRID_',process_prefix, '_',d.out,'_4sen.csv')))
+dat_out2 <- read_csv(here('confidential_data','processed',paste0('sn_level2RID_',process_prefix, '_',d.out,'_4sen.csv')))
 el_final <- read_csv(here('data','sen','networks',paste0('sn_ALLties_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
-l1key <-  readxl::read_excel(here('data','sen',paste0('field_key_level1_egos_alters_',d.out,'_KEY.xlsx')),sheet='KEY')
+l1key <-  readxl::read_excel(here('data','sen',paste0('field_key_level1_egos_alters_2025-09-23_KEY.xlsx')),sheet='KEY')
 l1key %<>% mutate(in_field=ifelse(in_field==0,2,in_field))
 
 
@@ -552,12 +554,12 @@ dat_all_egos <- unique(c(dat_out$sn_org_name, dat_out2$sn_org_name))
 all(dat_all_egos %in% el_all_actors)
 dat_all_egos[which(!dat_all_egos%in% el_all_actors)]
 
-el_final %<>% mutate(to=ifelse(to=='Ocean Protection Council','California Ocean Protection Council',to)) %>% distinct()
+el_final %<>% bind_rows(data.frame(from=dat_all_egos[which(!dat_all_egos%in% el_all_actors)], to=NA, r=1))
 
 ## get the alters that are not covered by survey data
 na_alters <- el_all_actors[which(!(el_all_actors %in% dat_all_egos))]
 
-length(na_alters); length(na_alters)/length(el_all_actors)  # 51%
+length(na_alters); length(na_alters)/length(el_all_actors)  # 49.7%
 
 na_alters
 
@@ -566,21 +568,36 @@ na_alters
 ## use a custom function to create an adjacency matrix that maintains the NA/0 entries for missing data/missing tie
 mat_out <- fill_adjacency_matrix_with_missing_data(el=dplyr::select(el_final, from,to), missing_data=na_alters, el_directed=TRUE)
 
-dim(mat_out)  ## 167x167
+dim(mat_out)  ## 173x 173
 heatmap(as.matrix(mat_out))  ## sparse matrix
 isSymmetric(mat_out)  ## yes!
 max(mat_out, na.rm=TRUE) ## 1
 
-## add survey respondents with no ties provided. 
-to_add <- dat_all_egos[which(!dat_all_egos%in% el_all_actors)] ## 9
-mat_out <- rbind(mat_out, matrix(data=0,nrow=length(to_add), ncol=ncol(mat_out), dimnames=list(to_add,colnames(mat_out))))
-mat_out <- make_square(mat_out)
-dim(mat_out)  ## 167x167
-isSymmetric(mat_out)  ## yes!
+## all survey respondents with no ties provided in matrix?
+dat_all_egos[which(!dat_all_egos%in% rownames(mat_out))] ## 0
 
 
 ## save
-saveRDS(mat_out, here('data','sen', 'networks',paste0('sn_l1l1_collab_multi_', process_prefix,'_MATRIX_bin_4sen_', d.out, '.rds')))
+saveRDS(mat_out, here('data','sen', 'networks',paste0('sn_ALLties_collab_multi_',process_prefix,'_MATRIXbin_4sen_',d.out,'.rds')))
 
 
+
+
+## create a WEIGHTED matrix
+## igraph wants symmetrical matrices for undirected graphs. 
+## use a custom function to create an adjacency matrix that maintains the NA/0 entries for missing data/missing tie
+mat_out2 <- fill_adjacency_matrix_with_missing_data(el=dplyr::select(el_final, from,to,r), missing_data=na_alters, el_directed=TRUE)
+
+dim(mat_out2)  ## 173x 173
+heatmap(as.matrix(mat_out2))  ## sparse matrix
+isSymmetric(mat_out2)  ## yes!
+max(mat_out2, na.rm=TRUE) == max(el_final$r, na.rm=TRUE)
+sum(mat_out2[upper.tri(mat_out2)], na.rm=TRUE) == sum(filter(el_final,from!=to)$r, na.rm=TRUE)
+
+## all survey respondents with no ties provided in matrix?
+dat_all_egos[which(!dat_all_egos%in% rownames(mat_out2))] ## 0
+
+
+## save
+saveRDS(mat_out2, here('data','sen', 'networks',paste0('sn_ALLties_collab_multi_',process_prefix,'_MATRIX_4sen_',d.out,'.rds')))
 
