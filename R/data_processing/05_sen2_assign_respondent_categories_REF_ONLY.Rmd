@@ -1,0 +1,273 @@
+---
+title: "Assign Survey Respondents to SEN categories"
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
+---
+
+**author: Mary Fisher**
+
+**date written: Feb 5 2025**
+
+**last updated:** Sep 25 2025
+
+
+# Description
+
+Assign survey respondents to one of three groups based on how they are involved in kelp forest issues (qxx) and how they get information on kelp forest conditions (q 9). 
+
+The "systematic direct observers" group (level 1) includes survey respondents who reported learning about kelp conditions by directly observing kelp forests *and* at least one of the following: 
+- by collecting and analyzing data
+- are involved in harvesting, fishing, or growing
+- are involved in restoration activities (this was written in by a handful of survey respondents)
+
+The "direct observers" group (level 2) includes survey respondents who reported learning about kelp conditions by directly observing kelp forests, but don't complete the activities that would put them in the "systematic" category. 
+
+Level 3 consist of all other survey respondents. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(magrittr)
+library(ggplot2)
+library(here)
+
+## save things to files? --
+WRITE_OUT=TRUE
+
+## directory info ---
+en.dir <- here('data','cal_open_data','kelp_sites')
+sn.dir <- here('../','russian','confidential_data','processed')
+# en.dir <- here('../','data','cal_open_data','kelp_sites')
+# sn.dir <- here('../','data','survey')
+
+## date stamp on input file
+d <- '2025-09-23'
+
+## the full survey data set, for looking up respondents
+sdat <- read_csv(here('../russian/confidential_data/raw/kelp_jan.9.25_copy.csv'))
+
+## which survey questions are helpful to see?
+qs_of_interest <- c('ResponseId','Status',"RecipientLastName","RecipientFirstName","Q3 Individual_1",colnames(sdat)[grepl('Q4',colnames(sdat))],colnames(sdat)[grepl('Q5',colnames(sdat))],colnames(sdat)[grepl('Q9',colnames(sdat))])
+```
+
+
+## Data
+
+this is the cleaned up social network with all respondents -- it is the version saved `r d`
+```{r echo=TRUE}
+sn <- read_csv(here(sn.dir, paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateORGmanEGO_4sen_',d,'.csv')))
+sn %<>% dplyr::select(-direct_observer)
+```
+
+this is the cleaned up data set on the answer to the question: What are the main ways you learn about kelp forest-related issues?
+```{r echo=TRUE}
+info <- read_csv(here(sn.dir,'cleaned_responseID_by_info_source_q9.csv'))
+```
+
+this is the cleaned up data set on the answer to the question: How are you involved in kelp forest-related issues?
+```{r echo=TRUE}
+act <- read_csv(here(sn.dir,'cleaned_responseID_by_activity_q4.csv'))
+```
+this is the cleaned up data set of which counties respondents are working in. 
+```{r echo=TRUE}
+loc <- read_csv(here(sn.dir,'cleaned_responseID_by_county.csv'))
+```
+
+
+## Classify part 1
+
+Classify respondents into **6 groups** according to what they do and where they get their info 
+```{r echo=FALSE}
+# connect data sets from above.
+to_classify <- sn %>% select(response_id, org_name, multi_org) %>% distinct() %>%
+  left_join(
+    info %>% group_by(response_id) %>% summarise(info_type=paste0(info_type,collapse=','))
+    ) %>% left_join(
+    act %>% group_by(response_id) %>% summarise(activity=paste0(activity,collapse=','))
+    )
+```
+```{r}
+to_classify %<>% 
+  mutate(group=case_when(
+    ## data collection AND harvest or fish or grow
+    grepl('I collect or analyze data',info_type) &  grepl('I directly observe conditions',info_type)  &
+      grepl('Harvesting or fishing or growing',activity) ~ 'data collection + hfg',
+   
+     grepl('I directly observe conditions',info_type)  &
+      grepl('Harvesting or fishing or growing',activity) & ( grepl('surveys',activity,ignore.case=TRUE) |
+                                                              grepl('data collection',activity,ignore.case=TRUE) |
+                                                              grepl('citizen science',activity,ignore.case=TRUE) ) ~ 'data collection + hfg',
+    
+    ## just data collection
+    grepl('I collect or analyze data',info_type) &  grepl('I directly observe conditions',info_type) ~ 'data collection',
+    grepl('I directly observe conditions',info_type) & grepl('surveys',activity,ignore.case=TRUE) ~ 'data collection',
+    grepl('I directly observe conditions',info_type) & grepl('RC volunteer',activity,ignore.case=TRUE) ~ 'data collection',
+    grepl('I directly observe conditions',info_type) & grepl('data collection',activity,ignore.case=TRUE) ~ 'data collection',
+    grepl('I directly observe conditions',info_type) & grepl('citizen science',activity,ignore.case=TRUE) ~ 'data collection',
+    
+    ## just hfg
+    grepl('I directly observe conditions',info_type) & grepl('Harvesting or fishing or growing',activity) ~ 'harvest or fish or grow',
+    
+    ## restoration
+    grepl('I directly observe conditions',info_type) & grepl('restoration', activity, ignore.case=TRUE) ~ 'restoration',
+    .default='other'))
+
+## breakout direct observers from the 'other' category
+to_classify %<>% mutate(group=ifelse(group=='other' & grepl('I directly observe conditions',info_type), 'direct observer',group))
+
+## revisit 'other' classifications for individuals involved in harvesting or fishing or growing.
+to_classify %<>% mutate(group=ifelse((grepl('Harvesting', activity) & group=="other" & grepl('collect or analyze data', info_type)), 'data collection + hfg', group))
+```
+
+make some customizations, based on info gathered through DISES and in survey p2 --
+- individual affiliated with Urchinomics - individual not based in US, no county information provided.
+- individual affiliated with UCD - hasn't started research project for which the survey qs were answered
+- individual affiliated with California Sea Grant - selected "data collection + hfg" in all counties. no alters provided, organization is a funding org / network that doesn't do its own data collection or harvesting/fishing/growing. cannot follow up. 
+- individual involved on their own - no data collection over the last 5 yrs based on literature review.
+- individual affiliated with UC Berkeley - has done past work outside of study area (CAN) and *is preparing for* US-based data collection. 
+```{r}
+to_classify %<>% mutate(group=case_when(
+  response_id=='R_20uTnIwAQ3UxMrw' ~ 'other',
+  response_id=='R_37vKJWxcl9TGyAh' ~ 'other',
+  response_id=='R_1ulIyefXrmNqx1f' ~ 'other',
+  response_id=='R_5crCJOcIX1ZVu5X' ~ 'direct observer',
+  response_id=='R_6qCLsUIEahCGBGw' ~ 'direct observer',
+  .default=group
+))
+```
+
+
+```{r}
+to_classify %>% group_by(group) %>% summarise(n=length(unique(response_id)))
+```
+
+
+## Systematic direct observers
+
+survey respondents who reported learning about kelp conditions by directly observing kelp forests *and* at least one of the following: 
+- by collecting and analyzing data
+- are involved in harvesting, fishing, or growing
+- are involved in restoration activities (this was written in by a handful of survey respondents)
+
+```{r echo=TRUE}
+dc_id <- filter(to_classify, group %in% c('data collection','data collection + hfg','harvest or fish or grow', 'restoration'))
+dc_id %>% group_by(group) %>% summarise(n=length(unique(response_id)), norg=length(unique(org_name)))
+```
+
+
+create a slimmed down data frame with organization and location info for these individuals, for use in script 03.
+```{r echo=TRUE}
+dc_id <-  unique(dc_id %>% pull(response_id))
+
+if(WRITE_OUT){
+sn_dc <- filter(sn, response_id %in% dc_id) %>%
+  left_join(select(to_classify, response_id, group)) %>%
+  select(response_id, group, org_name, multi_org) %>% distinct() %>%
+  left_join(loc) %>%
+  write_csv(here(sn.dir,paste0('datares_by_responseID_wCounty_',d,'.csv'))) }
+```
+
+
+```{r eval=WRITE_OUT}
+## save names to match to literature, grants where needed.
+tmp_out <- sn_dc %>% select(response_id,group,org_name,multi_org) %>% distinct() %>%
+  left_join(select(sdat,RecipientLastName,RecipientFirstName,ResponseId), by=c('response_id'='ResponseId'))
+
+tmp_out %>% filter(!is.na(RecipientLastName)) %>%
+  unite(RecipientFirstName,RecipientLastName, col='name',sep=' ', remove=TRUE) %>%
+  bind_rows(
+    tmp_out %>% filter(is.na(RecipientLastName)) %>%
+      separate(multi_org,sep=',', into=c('o2','o3','o4','o5','o6','o7','o8','o9')) %>%
+      pivot_longer(c(org_name, starts_with('o')), names_to='level',values_to='org_name') %>%
+      filter(!is.na(org_name)) %>%
+      group_by(org_name, group) %>% summarise(response_id=as.character(length(unique(response_id)))) %>% mutate(name=NA)
+  ) %>%
+  write_csv(here(sn.dir,paste0('datares_by_responseID_names_affiliates_',d,'.csv')))
+```
+
+
+## Classify part 2
+
+assign to levels based on group classifications in part 1. 
+```{r echo=TRUE}
+to_classify %<>% mutate(level=case_when(
+  response_id %in% dc_id ~ 1,
+  group=="direct observer" ~ 2,
+  group=="other" ~ 3,
+  .default=NA
+)) %>%
+  mutate(level_name=case_when(level==1~'systematic direct observers',
+                              level==2~'direct observers',
+                              level==3~'other kelp connected'))
+```
+
+```{r}
+to_classify %>% group_by(level_name) %>% summarise(n=length(unique(response_id)), 
+                                                   norgs=length(unique(org_name)),
+                                                   n4multi=sum(!is.na(multi_org))) %>%
+  mutate(p=n/length(unique(to_classify$response_id))) %>%
+  arrange(desc(n))
+```
+
+## Save
+
+Attach groups / levels to the social network data frame.
+```{r echo=TRUE, eval=WRITE_OUT}
+sn %>%
+  left_join(select(to_classify, response_id,group,level,level_name) %>% distinct(), by='response_id') %>%
+  write_csv(here(sn.dir, paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateORGmanEGO_4sen_',d,'_leveled.csv')))
+```
+
+
+## Summarize for supplement
+
+read in groups / levels data if needed
+```{r}
+dat <- read_csv(here(sn.dir, paste0('processed_by_responseID_q3orgs_q11collabs_updateINDupdateORGmanEGO_4sen_',d,'_leveled.csv')))
+```
+
+get a data frame of the group, level name, and all organization names associated with each respondent
+```{r}
+tmp <- dat %>% dplyr::select(response_id, group,level_name,org_name,starts_with('q3_several'))
+tmp %<>% pivot_longer(starts_with('q3'), names_to='org_level', values_to='org_name_2')
+tmp %<>% filter(org_name != org_name_2 | (is.na(org_name_2) & org_level=='q3_several_2')) %>% distinct()
+
+tmp %<>% dplyr::select(response_id, group,level_name,org_name) %>%
+  bind_rows(tmp %>% dplyr::select(response_id, group,level_name,org_name_2) %>% filter(!is.na(org_name_2)) %>% rename(org_name=org_name_2)) %>%
+  distinct()
+```
+
+
+attach info about in field / on water
+```{r}
+# tmp %>% filter(level_name=='systematic direct observers') %>% dplyr::select(org_name) %>% distinct() %>%
+#   write_csv(here('data','survey',paste0('ego_field_key_updated_',d,'.csv')))
+
+
+# field_key <- read_csv(here('data','survey',paste0('ego_field_key_updated_',d,'.csv')))
+field_key <- read_csv(here('data','survey','ego_field_key_updated.csv'))
+```
+
+
+for each group within systematic direct observers level (tier1), get (1) total number of organizations associated with respondents, and (2) number of field organizations associated with respondents. 
+```{r}
+tier1 <- tmp %>% filter(level_name=='systematic direct observers') %>%
+  left_join(field_key[,c(1,2)], by='org_name')
+
+any(is.na(tier1$in_field))
+```
+```{r}
+tier1 %<>% group_by(level_name,group) %>%
+  mutate(total_n=length(unique(response_id)),
+            total_norg=length(unique(org_name))) %>%
+  ungroup() %>%
+  mutate(in_field=ifelse(in_field==0, 0, 1)) %>%
+  group_by(level_name,group, total_n, total_norg, in_field) %>%
+  summarise(n=length(unique(response_id)),
+            norg=length(unique(org_name)))
+```
+
+

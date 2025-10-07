@@ -51,10 +51,14 @@ po/*~
 rsconnect/
 
 # Confidential files
-confidential_data/
-R/data_processing/kelp_network_v2.R
-R/data_processing/process_social_network.R
-R/data_processing/whatisgoingon_summary.R
-R/data_processing/kelp_network_alters_counties.R
+confidential_data/raw/*
+confidential_data/processed/*
+confidential_data/*/**.csv
+R/data_processing/04_process_orgs_4.R
 
 russian.Rproj
+data/sen/processed_by_responseID_alters_field.csv
+*.csv
+/doc/kelp_sn_for_marissa_09282025
+doc/kelp_sn_for_marissa_09282025.zip
+R/visuals/sn_for_sen_viz.Rmd
