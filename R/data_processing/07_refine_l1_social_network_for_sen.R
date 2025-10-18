@@ -58,6 +58,7 @@ l1key <-  readxl::read_excel(here('data','sen',paste0('field_key_level1_egos_alt
 l1key %<>% mutate(in_field=ifelse(in_field==0,2,in_field))
 
 
+
 # Categorize orgs ---------------------------------------------------------
 
 ## the social network contains data for level 1 survey respondents
@@ -71,15 +72,32 @@ el_final_l1 %<>% left_join(l1key, by=c('from'='org_name')) %>%
 any(is.na(el_final_l1$from_lvl))
 
 any(is.na(el_final_l1$to_lvl))
+View(filter(el_final_l1,is.na(to_lvl))) ## retaining an isolate
+el_final_l1 %<>% mutate(to_lvl=ifelse(is.na(to_lvl),1,to_lvl))
 
+
+any(is.na(el_final_l1$to_lvl))
 
 
 # Save l1-l1 --------------------------------------------------------------
 
 
-## first data frame: l1 - l1 connections.
+## l1 - l1 connections.
 el1_out <- filter(el_final_l1, from_lvl==1 & to_lvl==1)
-dim(el1_out); dim(el_final_l1)  # 358 to 156 links
+dim(el1_out); dim(el_final_l1)  # 361 to 163 links
+
+## l1 actors- missing any systematic direct observers that don't have level 1 ties? these willl be isolates in the l1-l1 network
+act1 <- filter(el_final_l1, from_lvl==1) %>% dplyr::select(from) %>% distinct() %>% rename(actor=from) %>%
+  bind_rows(filter(el_final_l1, to_lvl==1) %>% dplyr::select(to) %>% distinct() %>% rename(actor=to))
+act1 %<>% filter(!(actor %in% el1_out$from) & !(actor %in% el1_out$to))
+act1
+el1_out %<>% bind_rows(
+  act1 %>% 
+    rename(from=actor) %>% mutate(to=NA,r=1,tie='collab',from_lvl=1,to_lvl=1)
+)
+
+
+## save edgelist and node attribute data frame
 
 write_csv(el1_out, here('data','sen', 'networks',paste0('sn_l1l1_collab_multi_', process_prefix,'_EDGELIST_4sen_', d.out, '.csv')))
 
@@ -96,7 +114,7 @@ el1_out %<>% mutate(to=case_when(
   to!= 'Recreational or Commercial Divers' &
     grepl('Recreational Diver',to) ~ 'Recreational Divers',
   .default=to)) %>%
-  filter(to!="Recreational or Commercial Divers") %>% 
+  filter(to!="Recreational or Commercial Divers" | is.na(to)) %>% 
   bind_rows(filter(el1_out, to=="Recreational or Commercial Divers") %>%
               mutate(to='Recreational Divers'),
             filter(el1_out, to=="Recreational or Commercial Divers") %>%
@@ -114,22 +132,29 @@ na_alters
 ## create a matrix
 ## igraph wants symmetrical matrices for undirected graphs. 
 ## use a custom function to create an adjacency matrix that maintains the NA/0 entries for missing data/missing tie
+el1_out_4mat <- el1_out %>% filter(!is.na(to))
+el1_mat <- fill_adjacency_matrix_with_missing_data(el=dplyr::select(el1_out_4mat, from,to,r), missing_data=na_alters, el_directed=FALSE)
 
-el1_mat <- fill_adjacency_matrix_with_missing_data(el=dplyr::select(el1_out, from,to,r), missing_data=na_alters, el_directed=FALSE)
+dim(el1_mat)  ## 57 x 57
+heatmap(as.matrix(el1_mat))  ## sparse matrix
+isSymmetric(el1_mat)  ## yes!
 
-dim(el1_mat)  ## 55 x 55
+## add back in isolates
+to_add <- filter(el1_out, is.na(to)) %>% pull(from); to_add
+el1_mat <- rbind(el1_mat,matrix(data=0,nrow=length(to_add),ncol=dim(el1_mat)[2], dimnames=list(to_add,colnames(el1_mat))))
+el1_mat <- make_square(el1_mat,values_fill=0)
+
+dim(el1_mat)  ## 61 x 61
 heatmap(as.matrix(el1_mat))  ## sparse matrix
 isSymmetric(el1_mat)  ## yes!
 
 ## check matrix entries against input data frame
-sum(el1_mat[upper.tri(el1_mat)],na.rm=TRUE) == sum(el1_out$r)  ## true
+sum(el1_mat[upper.tri(el1_mat)],na.rm=TRUE) == (sum(el1_out$r)-length(to_add))  ## true
 max(el1_mat, na.rm=TRUE) == max(el1_out$r, na.rm=TRUE)         ## true
-
 
 
 ## save
 saveRDS(el1_mat, here('data','sen', 'networks',paste0('sn_l1l1_collab_multi_', process_prefix,'_MATRIX_4sen_', d.out, '.rds')))
-
 
 
 ## CHANGE TO BINARY
@@ -140,6 +165,74 @@ max(el1_mat2,na.rm=TRUE)
 ## save
 saveRDS(el1_mat2, here('data','sen', 'networks',paste0('sn_l1l1_collab_multi_', process_prefix,'_MATRIXbin_4sen_', d.out, '.rds')))
 
+
+
+
+# Summarize l1 actors ----------------------------------------------
+## this is for our results section
+
+## how many total? without collapsing commercial divers
+length(unique(filter(nodelist_l1out, !is.na(sn_org_name) & sn_org_name != 'Recreational or Commercial Divers')$sn_org_name))
+## how many individuals? without collapsing commercial divers
+length(unique(filter(nodelist_l1out, !is.na(sn_org_name) & sn_org_name != 'Recreational or Commercial Divers' & sn_org_type=='Individual')$sn_org_name))
+## how many organizations
+length(unique(filter(nodelist_l1out, !is.na(sn_org_name) & sn_org_type!='Individual')$sn_org_name))
+
+## Without collapsing diver alters: how many l1 actors in each group?
+filter(nodelist_l1out, !is.na(sn_org_name) & sn_org_name != 'Recreational or Commercial Divers') %>%
+  group_by(alter_only) %>% summarise(n=length(unique(sn_org_name)),n_respondents=sum(r))
+#       n    n_respondents
+#  0    40  131
+#  1    29  43
+
+
+
+
+## Collapsing diver alters
+
+nodelist_l1out_collapse <- nodelist_l1out %>% filter(!is.na(sn_org_name)) %>%
+  filter(sn_org_name != 'Recreational or Commercial Divers') %>% 
+  mutate(sn_org_name=case_when(
+    grepl('Commercial Diver',sn_org_name) ~ 'Commercial Divers',
+    grepl('Recreational Diver',sn_org_name) ~ 'Recreational Divers',
+    .default=sn_org_name)) %>%
+  bind_rows(nodelist_l1out %>% filter(sn_org_name == 'Recreational or Commercial Divers') %>%
+              mutate(sn_org_name = 'Recreational Divers'),
+            nodelist_l1out %>% filter(sn_org_name == 'Recreational or Commercial Divers') %>%
+              mutate(sn_org_name = 'Commercial Divers')) %>%
+  group_by(sn_org_name,sn_org_scale,sn_org_type,has_alter,alter_only) %>% summarise(r=sum(r))
+
+## how many actors total?
+length(unique(filter(nodelist_l1out_collapse, !is.na(sn_org_name))$sn_org_name))
+## how many l1 actors in each group? 
+filter(nodelist_l1out_collapse, !is.na(sn_org_name)) %>%
+  group_by(alter_only) %>% summarise(n=length(unique(sn_org_name)),n_respondents=sum(r))
+#       n    n_respondents
+#  0    40  131
+#  1    21  43
+
+
+filter(nodelist_l1out_collapse, !is.na(sn_org_name)) %>%
+  group_by(alter_only,sn_org_type) %>% summarise(n=length(unique(sn_org_name)))
+# alter_only sn_org_type                    n
+#   0 Commercial                     3
+#   0 Consulting                     1
+#   0 Government                     7
+#   0 Individual                     3
+#   0 NGO                           10
+#   0 Research                      12
+#   0 Tribal and Local Community     4
+#   1 Commercial                     3
+#   1 Government                     3
+#   1 Individual                     3
+#   1 NGO                            3
+#   1 Research                       8
+#   1 Tribal and Local Community     1
+
+## how many organizations v individuals as egos, alters?
+filter(nodelist_l1out_collapse, !is.na(sn_org_name)) %>%
+  mutate(sn_org_type=ifelse(sn_org_type=='Individual','Individual','organization')) %>%
+  group_by(alter_only,sn_org_type) %>% summarise(n=length(unique(sn_org_name)))
 
 
 
