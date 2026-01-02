@@ -34,7 +34,7 @@ source(here('R','subfxn','fill_adjacency_matrix_with_missing_data.R'))
 #
 d.in <- '2025-10-01'
 # d.out <- Sys.Date()
-d.out <- d.in
+d.out <- '2025-12-31'
 #
 # process_prefix <- 'updateINDupdateORG'
 process_prefix <- 'updateINDupdateORGmanEGO2'
@@ -86,7 +86,7 @@ any(is.na(el_final_l1$to_lvl))
 el1_out <- filter(el_final_l1, from_lvl==1 & to_lvl==1)
 dim(el1_out); dim(el_final_l1)  # 361 to 163 links
 
-## l1 actors- missing any systematic direct observers that don't have level 1 ties? these willl be isolates in the l1-l1 network
+## l1 actors- missing any systematic direct observers that don't have level 1 ties? these will be isolates in the l1-l1 network
 act1 <- filter(el_final_l1, from_lvl==1) %>% dplyr::select(from) %>% distinct() %>% rename(actor=from) %>%
   bind_rows(filter(el_final_l1, to_lvl==1) %>% dplyr::select(to) %>% distinct() %>% rename(actor=to))
 act1 %<>% filter(!(actor %in% el1_out$from) & !(actor %in% el1_out$to))
@@ -95,17 +95,6 @@ el1_out %<>% bind_rows(
   act1 %>% 
     rename(from=actor) %>% mutate(to=NA,r=1,tie='collab',from_lvl=1,to_lvl=1)
 )
-
-
-## save edgelist and node attribute data frame
-
-write_csv(el1_out, here('data','sen', 'networks',paste0('sn_l1l1_collab_multi_', process_prefix,'_EDGELIST_4sen_', d.out, '.csv')))
-
-nodelist_l1out <- filter(nodelist_l1, sn_org_name %in% c(el1_out$from, el1_out$to))
-write_csv(nodelist_l1out, here('data','sen', 'networks',paste0('sn_l1l1_collab_multi_', process_prefix,'_NODEATT_4sen_', d.out, '.csv')))
-
-
-# Create & save l1-l1 matrix ----------------------------------------------
 
 ## let's condense commercial divers, recreational divers nodes
 el1_out %<>% mutate(to=case_when(
@@ -123,16 +112,28 @@ el1_out %<>% mutate(to=case_when(
 el1_out %<>% distinct() %>%
   group_by(from,to,tie) %>% summarise(r=sum(r))
 
+
+## save edgelist and node attribute data frame
+
+write_csv(el1_out, here('data','sen', 'networks',paste0('sn_l1l1_collab_multi_', process_prefix,'_EDGELIST_4sen_', d.out, '.csv')))
+
+nodelist_l1out <- filter(nodelist_l1, sn_org_name %in% c(el1_out$from, el1_out$to))
+write_csv(nodelist_l1out, here('data','sen', 'networks',paste0('sn_l1l1_collab_multi_', process_prefix,'_NODEATT_4sen_', d.out, '.csv')))
+
+
+# Create & save l1-l1 matrix ----------------------------------------------
+
 ## get the alters that are not covered by survey data
 na_alters <- unique(c(el1_out$from, el1_out$to))[which(!(unique(c(el1_out$from, el1_out$to)) %in% sn_dat$sn_org_name))]
 length(na_alters); length(na_alters)/length(unique(c(el1_out$from, el1_out$to)))
 
 na_alters
+na_alters <- na_alters[!is.na(na_alters)]
 
 ## create a matrix
 ## igraph wants symmetrical matrices for undirected graphs. 
 ## use a custom function to create an adjacency matrix that maintains the NA/0 entries for missing data/missing tie
-el1_out_4mat <- el1_out %>% filter(!is.na(to))
+el1_out_4mat <- el1_out %>% filter(!is.na(to))  # remove isolates for this function
 el1_mat <- fill_adjacency_matrix_with_missing_data(el=dplyr::select(el1_out_4mat, from,to,r), missing_data=na_alters, el_directed=FALSE)
 
 dim(el1_mat)  ## 57 x 57
@@ -141,6 +142,7 @@ isSymmetric(el1_mat)  ## yes!
 
 ## add back in isolates
 to_add <- filter(el1_out, is.na(to)) %>% pull(from); to_add
+any(to_add %in% colnames(el1_mat)) # should be FALSE
 el1_mat <- rbind(el1_mat,matrix(data=0,nrow=length(to_add),ncol=dim(el1_mat)[2], dimnames=list(to_add,colnames(el1_mat))))
 el1_mat <- make_square(el1_mat,values_fill=0)
 
@@ -209,7 +211,7 @@ filter(nodelist_l1out_collapse, !is.na(sn_org_name)) %>%
   group_by(alter_only) %>% summarise(n=length(unique(sn_org_name)),n_respondents=sum(r))
 #       n    n_respondents
 #  0    40  131
-#  1    21  43
+#  1    21  46
 
 
 filter(nodelist_l1out_collapse, !is.na(sn_org_name)) %>%
@@ -217,16 +219,16 @@ filter(nodelist_l1out_collapse, !is.na(sn_org_name)) %>%
 # alter_only sn_org_type                    n
 #   0 Commercial                     3
 #   0 Consulting                     1
-#   0 Government                     7
+#   0 Government                     8
 #   0 Individual                     3
 #   0 NGO                           10
 #   0 Research                      12
-#   0 Tribal and Local Community     4
+#   0 Tribal and Local Community     3
 #   1 Commercial                     3
 #   1 Government                     3
-#   1 Individual                     3
+#   1 Individual                     2
 #   1 NGO                            3
-#   1 Research                       8
+#   1 Research                       9
 #   1 Tribal and Local Community     1
 
 ## how many organizations v individuals as egos, alters?
@@ -234,7 +236,11 @@ filter(nodelist_l1out_collapse, !is.na(sn_org_name)) %>%
   mutate(sn_org_type=ifelse(sn_org_type=='Individual','Individual','organization')) %>%
   group_by(alter_only,sn_org_type) %>% summarise(n=length(unique(sn_org_name)))
 
-
+# alter_only sn_org_type      n
+# 0   Individual              3
+# 0   organization            37
+# 1   Individual              2
+# 1   organization            19
 
 
 
