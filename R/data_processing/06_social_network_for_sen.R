@@ -108,7 +108,7 @@ all_orgs <- data.frame(egos_full_name=all_egos) %>%
                                    alter_sub=paste0(unique(alter_subgroup),collapse=','))
 
 ## save this to create a manual key
-write_csv(all_orgs,here('data','sen',paste0('sn_match_ego_alter_organizations_',d.out,'.csv')))
+# write_csv(all_orgs,here('data','sen',paste0('sn_match_ego_alter_organizations_',d.out,'.csv')))
 # 
 # data.frame(org_name=unique(c(all_egos,all_alters))) %>%
 #   write_csv(here('data','sen','sn_match_ego_alter_organizations_KEY.csv'))  ## this will overwrite existing key!!
@@ -133,16 +133,17 @@ dat_out %<>%
   filter(!is.na(ego))
 
 ## make sure we're not missing any orgs, and that the 'org_name' column always represents the q3_1 org
-any(is.na(dat_out$org_name)); any(is.na(dat_out$ego)); any(is.na(dat_out$alter))
+any(is.na(dat_out$org_name)); any(is.na(dat_out$ego)) # false
+any(is.na(dat_out$alter)) # ok to be true
 any(filter(dat_out,ego_level=='q3_individual_1')$org_name != filter(dat_out,ego_level=='q3_individual_1')$ego) # false
 any(filter(dat_out,ego_level=='q3_several_1')$org_name != filter(dat_out,ego_level=='q3_several_1')$ego) #false
 
 # apply re-naming to 'dat' dataframe. make sure we get all orgs for multi org respondents
 dat_out %<>% dplyr::select(-org_name) %>%
   ## new names for egos
-  left_join(key, by=c('ego'='org_name')) %>%
+  left_join(key, by=c('ego'='org_name'))
   ## new names for alters
-  left_join(key %>% rename(alter=org_name, sn_alter=sn_org_name,sn_alter_scale=sn_org_scale,sn_alter_type=sn_org_type), by=c('alter'))
+dat_out %<>% left_join(key %>% rename(alter=org_name, sn_alter=sn_org_name,sn_alter_scale=sn_org_scale,sn_alter_type=sn_org_type), by=c('alter'))
 
 
 
@@ -168,8 +169,9 @@ any(is.na(filter(dat_out, !is.na(alter))$sn_alter))
 ## adjust UC Davis / BML affiliations
 dat_out %<>% filter(response_id != 'R_50f07NmTN6tehhY') %>%
   bind_rows(dat_out %>% filter(response_id=='R_50f07NmTN6tehhY') %>%
-              mutate(ego='University of California Davis - Bodega Marine Laboratory', 
-                     sn_org_name='University of California Davis - Bodega Marine Laboratory',
+              mutate(ego=ifelse(grepl('Davis',ego), 'University of California Davis - Bodega Marine Laboratory', ego),
+                     sn_org_name=ifelse(grepl('Davis',ego),'University of California Davis - Bodega Marine Laboratory',sn_org_name),
+                     sn_org_scale=ifelse(grepl('Davis',ego),'Regional',sn_org_scale),
                      multi_org=str_replace(multi_org,'University of California Davis','University of California Davis - Bodega Marine Laboratory')))
 
 ## save as data frame
@@ -230,7 +232,7 @@ write_csv(el0, here('data','sen','networks',paste0('sn_dataresRID_collab_multi_'
 el_4graph <- el0 %>% group_by(sn_org_name,sn_org_scale,sn_org_type,sn_alter,sn_alter_scale,sn_alter_type) %>%
   summarise(r=sum(r), tie=paste0(unique(tie),collapse=',')) %>% distinct() %>%
   filter(!is.na(sn_alter))
-dim(el0); dim(el_4graph)  ## 445 to 427
+dim(el0); dim(el_4graph)  ## 444 to 426
 
 ## create and simplify a graph in which the edge attribute is the number of responses
 g1 <- igraph::graph_from_edgelist(el=cbind(el_4graph$sn_org_name, el_4graph$sn_alter), directed=FALSE)
@@ -264,10 +266,14 @@ head(el_outt); head(el_outr)
 el_out <- left_join(el_outr,el_outt, by=c('from','to'))
 head(el_out)
 
-
 ## ANY ISOLATES missing entirely?
 el0 %>% filter(is.na(sn_alter) & !(sn_org_name %in% c(el_out$from,el_out$to)))
-
+el0 %>% filter(sn_org_name==sn_alter & !(sn_org_name %in% c(el_out$from,el_out$to)))
+el_out %<>% bind_rows(
+  el0 %>% filter(sn_org_name==sn_alter & !(sn_org_name %in% c(el_out$from,el_out$to))) %>% mutate(from=sn_org_name,to=NA) %>%
+    ungroup() %>% 
+    dplyr::select(colnames(el_out))
+)
 
 
 ## save over file above
@@ -487,6 +493,7 @@ write_csv(natt, here('data','sen','networks',paste0('sn_level2RID_collab_multi_'
 ## read in both edge lists.
 el_final_l1 <- read_csv(here('data','sen','networks',paste0('sn_dataresRID_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
 el_final_l2 <- read_csv(here('data','sen','networks',paste0('sn_level2RID_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
+dat_out <- read_csv(here('confidential_data','processed',paste0('sn_dataresRID_',process_prefix, '_',d.out,'_4sen.csv')))
   
 ## create a key to classify both ego and alter actors / organizations as level 1 or not.
 dat_org_lvl <- dat_out %>% group_by(sn_org_name,ego,sn_org_type) %>% 
@@ -509,12 +516,12 @@ el_final_l1 %<>% left_join(l1key %>% rename(from_lvl=in_field), by=c('from'='org
 any(is.na(el_final_l1$from_lvl))
 el_final_l1 %<>% left_join(l1key %>% rename(to_lvl=in_field), by=c('to'='org_name'))
 any(is.na(el_final_l1$to_lvl))
-
+View(filter(el_final_l1,is.na(to_lvl))) # should be only 1, elkhorn slough
 
 el_final_l2 %<>% left_join(l1key %>% rename(from_lvl=in_field), by=c('from'='org_name'))
-any(is.na(el_final_l2$from_lvl))
+any(is.na(el_final_l2$from_lvl)) ## true, these are level 2s
 el_final_l2 %<>% left_join(l1key %>% rename(to_lvl=in_field), by=c('to'='org_name'))
-any(is.na(el_final_l2$to_lvl))
+any(is.na(el_final_l2$to_lvl)) ## true, these are level 2s
 ##  FOR NOW, AUTOMATICALLY MAKE UNKNOWN ALTERS LEVEL 2 FOR LEVEL 2 SURVEY RESPONDENTS
 el_final_l2 %<>% mutate(from_lvl=ifelse(is.na(from_lvl),2,from_lvl),
                         to_lvl=ifelse(is.na(to_lvl),2,to_lvl))
@@ -531,8 +538,9 @@ dim(el_final)
 
 ## there will still be inverse duplicates in this data set, 
 ##   but the respondent counts are correct with changes to process_orgs_4.
-View(filter(el_final, grepl('Berkeley',from), grepl('Berkeley',to)))   # two level 1 respondents linked to kashia band, one level 2
-
+View(filter(el_final, grepl('Berkeley',from) | grepl('Berkeley',to)))   # two level 1 respondents linked to kashia band, one level 2
+View(filter(el_final, grepl('Elkhorn',from) | grepl('Elkhorn',to))) 
+View(filter(el_final, grepl('Bodega',from) | grepl('Bodega',to)))
 
 ## save 
 write_csv(el_final, here('data','sen','networks',paste0('sn_ALLties_collab_multi_',process_prefix,'_EDGELIST_4sen_',d.out,'.csv')))
@@ -550,16 +558,15 @@ l1key %<>% mutate(in_field=ifelse(in_field==0,2,in_field))
 el_all_actors <- unique(c(el_final$from, el_final$to))
 dat_all_egos <- unique(c(dat_out$sn_org_name, dat_out2$sn_org_name))
 
-## some actors had no social network connections. add these in with NA
-all(dat_all_egos %in% el_all_actors)
-dat_all_egos[which(!dat_all_egos%in% el_all_actors)]
-
-el_final %<>% bind_rows(data.frame(from=dat_all_egos[which(!dat_all_egos%in% el_all_actors)], to=NA, r=1))
+## some actors had no social network connections. add these in with NA?
+all(dat_all_egos %in% el_all_actors)  # as of 10/17 this is TRUE
+# dat_all_egos[which(!dat_all_egos%in% el_all_actors)]
+# el_final %<>% bind_rows(data.frame(from=dat_all_egos[which(!dat_all_egos%in% el_all_actors)], to=NA, r=1))
 
 ## get the alters that are not covered by survey data
 na_alters <- el_all_actors[which(!(el_all_actors %in% dat_all_egos))]
 
-length(na_alters); length(na_alters)/length(el_all_actors)  # 49.7%
+length(na_alters); length(na_alters)/length(el_all_actors)  # 49.1%
 
 na_alters
 
@@ -568,7 +575,7 @@ na_alters
 ## use a custom function to create an adjacency matrix that maintains the NA/0 entries for missing data/missing tie
 mat_out <- fill_adjacency_matrix_with_missing_data(el=dplyr::select(el_final, from,to), missing_data=na_alters, el_directed=TRUE)
 
-dim(mat_out)  ## 173x 173
+dim(mat_out)  ## 174 x 174
 heatmap(as.matrix(mat_out))  ## sparse matrix
 isSymmetric(mat_out)  ## yes!
 max(mat_out, na.rm=TRUE) ## 1
@@ -588,7 +595,7 @@ saveRDS(mat_out, here('data','sen', 'networks',paste0('sn_ALLties_collab_multi_'
 ## use a custom function to create an adjacency matrix that maintains the NA/0 entries for missing data/missing tie
 mat_out2 <- fill_adjacency_matrix_with_missing_data(el=dplyr::select(el_final, from,to,r), missing_data=na_alters, el_directed=TRUE)
 
-dim(mat_out2)  ## 173x 173
+dim(mat_out2)  ## 174x 174
 heatmap(as.matrix(mat_out2))  ## sparse matrix
 isSymmetric(mat_out2)  ## yes!
 max(mat_out2, na.rm=TRUE) == max(el_final$r, na.rm=TRUE)
