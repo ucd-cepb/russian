@@ -4,7 +4,7 @@ library(tidyverse)
 library(dplyr)
 library(paletteer)
 
-dat_survey <- read_csv("data_yang/dat_kelp_survey.csv")[-c(1,2),]
+dat_survey <- read_csv("Desktop/R_stuff/kelp_restoration/russian/data/dat_kelp_survey.csv")[-c(1,2),]
 
 # Question 1 -----------
 
@@ -1353,7 +1353,7 @@ ggplot(question_8, aes(x = statement, fill = response)) +
    theme_minimal() +
    theme(axis.text.x = element_text(angle = 30, hjust = 1))
 
-# Question 8.1 Preferences by region -------
+# Question 8.1-8.4 Preferences by region -------
 
 question_8.1 <- dat_survey %>% 
    select(ResponseId, Q5_1, Q5_2, Q5_3, Q5_4, Q5_5, Q5_6, Q5_7, Q5_8, Q5_9, Q5_10, Q5_11, Q5_12, Q5_13, Q5_14, Q5_16, Q8_1, Q8_2, Q8_3, Q8_4, Q8_5, Q8_6, Q8_7, Q8_8)
@@ -1525,6 +1525,58 @@ ggplot(question_8.4, aes(x = statement, fill = choice)) +
    paletteer::scale_fill_paletteer_d("LaCroixColoR::PeachPear", direction = 1) +
    theme_minimal() +
    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+# Question 8.5 for paper 1 -------
+question_8.5 <- dat_survey %>% 
+  select(starts_with("Q8"))
+
+question_8.5 <- question_8.5 %>%
+  pivot_longer(cols = c(Q8_1, Q8_2, Q8_3, Q8_4, Q8_5, Q8_6, Q8_7, Q8_8), names_to = "question", values_to = "response")
+
+question_8.5 <- question_8.5 %>%
+  mutate(response = case_when(
+    response == "Somewhat disgree" ~ "Somewhat disagree",
+    TRUE ~ response))
+
+question_8.5 <- question_8.5 %>%
+  filter(!is.na(response))
+
+question_8.5 <- question_8.5 %>%
+  mutate(statement = case_when(
+    question == "Q8_1" ~ "resist 1",
+    question == "Q8_2" ~ "accept",
+    question == "Q8_3" ~ "direct 1",
+    question == "Q8_4" ~ "resist 2",
+    question == "Q8_5" ~ "direct 2",
+    question == "Q8_6" ~ "low risk low reward",
+    question == "Q8_7" ~ "high risk high reward",
+    question == "Q8_8" ~ "learn more"
+  ))
+
+question_8.5 <- question_8.5 %>%
+  mutate(
+    response = factor(response, levels = c(
+      "Strongly agree", "Somewhat agree", "Neither agree nor disagree", 
+      "Somewhat disagree", "Strongly disagree", "Don't know"
+    )),
+    statement = factor(statement, levels = c(
+      "resist 1", "resist 2", "accept", "direct 1", "direct 2", "low risk low reward",
+      "high risk high reward", "learn more"
+    ))
+  )
+
+ggplot(question_8.5, aes(x = statement, fill = response)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Question 8: How much you agree or disagree with the following statements 
+                   about managing kelp forests",
+    x = " ",
+    y = "Number of responses",
+    fill = "Response"
+  ) +
+  paletteer::scale_fill_paletteer_d("LaCroixColoR::PeachPear", direction = 1) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
 
 # Question 9 ------
 question_9 <- dat_survey %>% 
